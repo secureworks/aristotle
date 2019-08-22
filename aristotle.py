@@ -14,7 +14,7 @@ import sys
 
 DEBUG = True
 
-def print_error(msg, fatal=False):
+def print_error(msg, fatal=True):
     print("ERROR: %s" % msg)
     if fatal:
         print("Cannot continue")
@@ -57,7 +57,7 @@ try:
             if line.lstrip().startswith('#'):
                 if not disabled_rule_re.match(line):
                     # valid comment (not disabled rule)
-                    print_debug("Skipping comment")
+                    print_debug("Skipping comment: %s" % line)
                     continue
 
             # extract sid
@@ -72,7 +72,7 @@ try:
             if matchobj:
                 metadata_str = matchobj.group("METADATA")
             if (lineno % 1000) == 0:
-                print_debug("%s" % metadata_str)
+                print_debug("metadata_str for sid %d:\n%s" % (sid, metadata_str))
 
             # build dict
             metadata_dict[sid] = {'metadata': {},
@@ -93,10 +93,9 @@ try:
                     metadata_dict[sid]['metadata'][k] = []
                 metadata_dict[sid]['metadata'][k].append(v)
 
-            if (lineno % 1000) == 0:
-                print_debug("%s" % metadata_dict)
 
             lineno += 1
+        print_debug("metadata_dict:\n%s" % metadata_dict)
 
 except Exception as e:
     print_error("Problem reading ruleset file '%s':\n%s" % (args.ruleset_file, e), fatal=True)
