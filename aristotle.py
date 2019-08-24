@@ -42,6 +42,7 @@ if not os.path.isfile(args.ruleset_file):
     print_error("Provided ruleset file does not exist: '%s'" % args.ruleset_file, fatal=True)
 
 metadata_dict = {}
+keys_dict = {}
 
 disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log)\x20.*[\x28\s\x3B]sid\s*\x3A\s*\d+\s*\x3B")
 sid_re = re.compile(r"[\x28\s\x3B]sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
@@ -71,7 +72,7 @@ try:
             matchobj = metadata_keyword_re.search(line)
             if matchobj:
                 metadata_str = matchobj.group("METADATA")
-            if (lineno % 1000) == 0:
+            if DEBUG and (lineno % 1000 == 0):
                 print_debug("metadata_str for sid %d:\n%s" % (sid, metadata_str))
 
             # build dict
@@ -88,14 +89,21 @@ try:
                 if len(kvsplit) < 2:
                     # just a single word in metadata; skip?
                     continue
-                k, v = kvpair.strip().split(' ', 1)
+                k, v = kvsplit
+                # populate metadata_dict
                 if k not in metadata_dict[sid]['metadata'].keys():
                     metadata_dict[sid]['metadata'][k] = []
                 metadata_dict[sid]['metadata'][k].append(v)
-
+                # populate keys_dict
+                if k not in keys_dict.keys():
+                    keys_dict[k] = {}
+                if v not in keys_dict[k].keys():
+                    keys_dict[k][v] = []
+                keys_dict[k][v].append(sid)
 
             lineno += 1
-        print_debug("metadata_dict:\n%s" % metadata_dict)
+        #print_debug("metadata_dict:\n%s" % metadata_dict)
+        #print_debug("keys_dict:\n%s" % keys_dict)
 
 except Exception as e:
     print_error("Problem reading ruleset file '%s':\n%s" % (args.ruleset_file, e), fatal=True)
