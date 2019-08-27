@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Aristotle CLI - command line tool for slicing-and-dicing
 Suricata and Snort rulesets based on metadata keyword values.
@@ -6,13 +6,27 @@ Suricata and Snort rulesets based on metadata keyword values.
 # Copyright 2019 Secureworks
 #
 # Licensed under (TBD)
+#
+# TODO: stats
+#       flowbits?
+#       ?
 
 import argparse
+import boolean
 import os
 import re
 import sys
 
 DEBUG = True
+
+global ruleset_file, filter_string, output_file, filter_file
+
+metadata_dict = {}
+keys_dict = {}
+
+disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log)\x20.*[\x28\s\x3B]sid\s*\x3A\s*\d+\s*\x3B")
+sid_re = re.compile(r"[\x28\s\x3B]sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
+metadata_keyword_re = re.compile(r"[\x28\s\x3B]metadata\s*\x3A\s*(?P<METADATA>[^\x3B]+)\x3B")
 
 def print_error(msg, fatal=True):
     print("ERROR: %s" % msg)
@@ -35,18 +49,54 @@ parser.add_argument("-r", "--rules", "--ruleset",
                     dest="ruleset_file",
                     required=True,
                     help="path to rules file")
+parser.add_argument("-s", "--filter",
+                    action="store",
+                    dest="filter_string",
+                    required=False,
+                    default = None,
+                    help="boolean filter string")
+parser.add_argument("-o", "--output",
+                    action="store",
+                    dest="output_file",
+                    required=False,
+                    default="<stdout>",
+                    help="output file")
+parser.add_argument("-c", "--config",
+                    action="store",
+                    dest="filter_file",
+                    required=False,
+                    default = None,
+                    help="config file containing boolean filter string")
+parser.add_argument("-d", "--debug",
+                    action="store_true",
+                    default=False,
+                    required=False,
+                    help="turn on debug output")
+# TODO: log file?
+
 
 args = parser.parse_args()
+
+if args.debug:
+    DEBUG = True
 
 if not os.path.isfile(args.ruleset_file):
     print_error("Provided ruleset file does not exist: '%s'" % args.ruleset_file, fatal=True)
 
-metadata_dict = {}
-keys_dict = {}
+if args.output_file != "<stdout>" and os.path.isfile(args.output_file):
+    print("Warning: output file '%s' already exits.  Overwrite? [y/N]  " % args.output_file)
+    # TODO: prompt for input
+    sys.exit(0)
 
-disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log)\x20.*[\x28\s\x3B]sid\s*\x3A\s*\d+\s*\x3B")
-sid_re = re.compile(r"[\x28\s\x3B]sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
-metadata_keyword_re = re.compile(r"[\x28\s\x3B]metadata\s*\x3A\s*(?P<METADATA>[^\x3B]+)\x3B")
+if not args.filter_file:
+    if not args.filter_string:
+        print_error("Provided config filter file does not exist: '%s'" % args.filter_file, fatal=True)
+    filter_string = args.filter_string
+else:
+    if not os.path.isfile(args.filter_file):
+        print_error("Provided config filter file does not exist: '%s'" % args.filter_file, fatal=True)
+    with open(args.filter_file, 'r') as fh:
+        filter_string = fh.read()
 
 try:
     with open(args.ruleset_file, 'r') as ruleset_fh:
@@ -87,7 +137,7 @@ try:
             for kvpair in metadata_str.split(','):
                 kvsplit = kvpair.strip().split(' ', 1)
                 if len(kvsplit) < 2:
-                    # just a single word in metadata; skip?
+                    # just a single word in metadata; warning? skip?
                     continue
                 k, v = kvsplit
                 # populate metadata_dict
@@ -95,6 +145,7 @@ try:
                     metadata_dict[sid]['metadata'][k] = []
                 metadata_dict[sid]['metadata'][k].append(v)
                 # populate keys_dict
+                # TODO: dont' include disabled rules?
                 if k not in keys_dict.keys():
                     keys_dict[k] = {}
                 if v not in keys_dict[k].keys():
