@@ -9,7 +9,9 @@ Suricata and Snort rulesets based on metadata keyword values.
 #
 # TODO: stats
 #       flowbits?
-#       ?
+#       use objects; make importable/lib
+#       command line option to enable disabled rules when evaluating?
+#       log file?
 
 import argparse
 import boolean
@@ -29,8 +31,8 @@ keys_dict = {}
 metadata_map = {}
 
 disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log)\x20.*[\x28\s\x3B]sid\s*\x3A\s*\d+\s*\x3B")
-sid_re = re.compile(r"[\x28\s\x3B]sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
-metadata_keyword_re = re.compile(r"[\x28\s\x3B]metadata\s*\x3A\s*(?P<METADATA>[^\x3B]+)\x3B")
+sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
+metadata_keyword_re = re.compile(r"[\x28\x3B]\s*metadata\s*\x3A\s*(?P<METADATA>[^\x3B]+)\x3B")
 
 def print_error(msg, fatal=True):
     print("ERROR: %s" % msg)
@@ -136,7 +138,7 @@ try:
             matchobj = metadata_keyword_re.search(line)
             if matchobj:
                 metadata_str = matchobj.group("METADATA")
-            if DEBUG and (lineno % 1000 == 0):
+            if (DEBUG and (lineno % 1000 == 0)):
                 print_debug("metadata_str for sid %d:\n%s" % (sid, metadata_str))
 
             # build dict
@@ -152,6 +154,7 @@ try:
                 kvsplit = kvpair.strip().split(' ', 1)
                 if len(kvsplit) < 2:
                     # just a single word in metadata; warning? skip?
+                    print_warning("Single word metatdata value found: %s" % kvsplit)
                     continue
                 k, v = kvsplit
                 # populate metadata_dict
@@ -178,6 +181,8 @@ def get_all_enabled_swids():
 
 def get_swids(kvpair, negate=False):
     # TODO: handle key ALL situation
+    # TODO: support date ranges for created_at and updated_at
+    # TODO: support inclusion of default-disabled rules
     k, v = kvpair.split(' ', 1)
     retarray = []
     if k not in keys_dict.keys():
@@ -186,9 +191,10 @@ def get_swids(kvpair, negate=False):
         if v not in keys_dict[k]:
             print_warning("metadata key-value pair '%s' not found in ruleset" % kvpair)
         else:
-            retarray = keys_dict[k][v]
+            retarray = [s for s in keys_dict[k][v] if not metadata_dict[s]['disabled']]
     if negate:
-        return list(frozenset(get_all_enabled_swids()) - frozenset(retarray))
+        # if key or value not found, this will be all rules
+        retarray = list(frozenset(get_all_enabled_swids()) - frozenset(retarray))
     return retarray
 
 def evaluate(myobj):
@@ -199,9 +205,15 @@ def evaluate(myobj):
         else:
             return get_swids(metadata_map[myobj.obj])
     elif isinstance(myobj, boolean.boolean.OR):
-        return list(set(evaluate(myobj.args[0]) + evaluate(myobj.args[1])))
+        retlist = []
+        for i in range(0, len(myobj.args)):
+            retlist = list(set(retlist + evaluate(myobj.args[i])))
+        return retlist
     elif isinstance(myobj, boolean.boolean.AND):
-        return list(frozenset(evaluate(myobj.args[0])).intersection(evaluate(myobj.args[1])))
+        retlist = list(frozenset(evaluate(myobj.args[0])))
+        for i in range(1, len(myobj.args)):
+            retlist = list(frozenset(retlist).intersection(evaluate(myobj.args[i])))
+        return retlist
 
 # process boolean string
 def filter_ruleset(filter=None):
@@ -213,11 +225,11 @@ def filter_ruleset(filter=None):
     # handle building the tree.
     mytokens = re.findall(r'\x22[a-zA-Z0-9_]+\s[^\x22]+\x22', filter, re.DOTALL)
     if not mytokens or len(mytokens) == 0:
-        # why go on living? nothing to filter on
+        # nothing to filter on ... why go on living?
         print_error("filter string contains no tokens", fatal=True)
     for t in mytokens:
         tstrip = t.strip('"')
-        print tstrip
+        print_debug(tstrip)
         # if token begins with digit, the tokenizer doesn't like it
         hashstr = "D" + hashlib.md5(tstrip.encode()).hexdigest()
         # add to mapp dict
@@ -225,7 +237,7 @@ def filter_ruleset(filter=None):
         # replace in filter str
         filter = filter.replace(t, hashstr)
 
-    print filter
+    print_debug(filter)
     try:
         algebra = boolean.BooleanAlgebra()
         mytree = algebra.parse(filter).literalize().simplify()
@@ -236,4 +248,5 @@ def filter_ruleset(filter=None):
 
 results = filter_ruleset()
 
-print results
+print(results)
+print("Total: %d" % len(results))
