@@ -1,11 +1,13 @@
 (
-    "protocols http"
-OR
-    "protocols tls"
-)
-AND
-(
-    "priority high"
+    (
+        "protocols http"
+    OR
+        "protocols tls"
+    )
+  AND
+    (
+        "priority high"
+    )
 )
 OR
 (
