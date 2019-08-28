@@ -13,6 +13,7 @@ Suricata and Snort rulesets based on metadata keyword values.
 
 import argparse
 import boolean
+import hashlib
 import os
 import re
 import sys
@@ -21,8 +22,11 @@ DEBUG = True
 
 global ruleset_file, filter_string, output_file, filter_file
 
+suppress_warnings = False
+
 metadata_dict = {}
 keys_dict = {}
+metadata_map = {}
 
 disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log)\x20.*[\x28\s\x3B]sid\s*\x3A\s*\d+\s*\x3B")
 sid_re = re.compile(r"[\x28\s\x3B]sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
@@ -39,7 +43,7 @@ def print_debug(msg):
         print("DEBUG: %s" % msg)
 
 def print_warning(msg):
-    if msg:
+    if not suppress_warnings and msg:
         print("WARNING: %s" % msg)
 
 parser = argparse.ArgumentParser()
@@ -49,7 +53,7 @@ parser.add_argument("-r", "--rules", "--ruleset",
                     dest="ruleset_file",
                     required=True,
                     help="path to rules file")
-parser.add_argument("-s", "--filter",
+parser.add_argument("-f", "--filter",
                     action="store",
                     dest="filter_string",
                     required=False,
@@ -67,8 +71,15 @@ parser.add_argument("-c", "--config",
                     required=False,
                     default = None,
                     help="config file containing boolean filter string")
+parser.add_argument("-q", "--quiet",
+                    action="store_true",
+                    dest="quiet",
+                    default=False,
+                    required=False,
+                    help="quiet; suppress warning messages")
 parser.add_argument("-d", "--debug",
                     action="store_true",
+                    dest="debug",
                     default=False,
                     required=False,
                     help="turn on debug output")
@@ -79,6 +90,9 @@ args = parser.parse_args()
 
 if args.debug:
     DEBUG = True
+
+if args.quiet:
+    suppress_warnings = True
 
 if not os.path.isfile(args.ruleset_file):
     print_error("Provided ruleset file does not exist: '%s'" % args.ruleset_file, fatal=True)
@@ -145,7 +159,7 @@ try:
                     metadata_dict[sid]['metadata'][k] = []
                 metadata_dict[sid]['metadata'][k].append(v)
                 # populate keys_dict
-                # TODO: dont' include disabled rules?
+                # TODO: don't include disabled rules?
                 if k not in keys_dict.keys():
                     keys_dict[k] = {}
                 if v not in keys_dict[k].keys():
@@ -158,3 +172,68 @@ try:
 
 except Exception as e:
     print_error("Problem reading ruleset file '%s':\n%s" % (args.ruleset_file, e), fatal=True)
+
+def get_all_enabled_swids():
+    return [s for s in metadata_dict.keys() if not metadata_dict[s]['disabled']]
+
+def get_swids(kvpair, negate=False):
+    # TODO: handle key ALL situation
+    k, v = kvpair.split(' ', 1)
+    retarray = []
+    if k not in keys_dict.keys():
+        print_warning("metadata key '%s' not found in ruleset" % k)
+    else:
+        if v not in keys_dict[k]:
+            print_warning("metadata key-value pair '%s' not found in ruleset" % kvpair)
+        else:
+            retarray = keys_dict[k][v]
+    if negate:
+        return list(frozenset(get_all_enabled_swids()) - frozenset(retarray))
+    return retarray
+
+def evaluate(myobj):
+    if myobj.isliteral:
+        #TODO: deal with "sid nnnn"
+        if isinstance(myobj, boolean.boolean.NOT):
+            return get_swids(metadata_map[myobj.args[0].obj], negate=True)
+        else:
+            return get_swids(metadata_map[myobj.obj])
+    elif isinstance(myobj, boolean.boolean.OR):
+        return list(set(evaluate(myobj.args[0]) + evaluate(myobj.args[1])))
+    elif isinstance(myobj, boolean.boolean.AND):
+        return list(frozenset(evaluate(myobj.args[0])).intersection(evaluate(myobj.args[1])))
+
+# process boolean string
+def filter_ruleset(filter=None):
+    if not filter:
+        filter = filter_string
+    # the boolean.py library uses tokenize which isn't designed to
+    # handle multiline tokens (and doesn't support quoting). So
+    # just replace and map to single word and let boolean.py
+    # handle building the tree.
+    mytokens = re.findall(r'\x22[a-zA-Z0-9_]+\s[^\x22]+\x22', filter, re.DOTALL)
+    if not mytokens or len(mytokens) == 0:
+        # why go on living? nothing to filter on
+        print_error("filter string contains no tokens", fatal=True)
+    for t in mytokens:
+        tstrip = t.strip('"')
+        print tstrip
+        # if token begins with digit, the tokenizer doesn't like it
+        hashstr = "D" + hashlib.md5(tstrip.encode()).hexdigest()
+        # add to mapp dict
+        metadata_map[hashstr] = tstrip
+        # replace in filter str
+        filter = filter.replace(t, hashstr)
+
+    print filter
+    try:
+        algebra = boolean.BooleanAlgebra()
+        mytree = algebra.parse(filter).literalize().simplify()
+        return evaluate(mytree)
+
+    except Exception as e:
+        print_error("Problem processing filter string:\n\n%s\n\nError:\n%s" % (filter, e), fatal=True)
+
+results = filter_ruleset()
+
+print results
