@@ -10,10 +10,11 @@ import { AgGridModule } from 'ag-grid-angular';
 
 import { RulesetComponent } from './views/ruleset/ruleset.component';
 import { MetadataComponent } from './views/metadata/metadata.component';
+import { BuildFilterComponent } from './views/build-filter/build-filter.component';
 
 @NgModule({
   declarations: [
-    AppComponent, RulesetComponent, MetadataComponent
+    AppComponent, RulesetComponent, MetadataComponent, BuildFilterComponent
   ],
   imports: [
     BrowserModule,

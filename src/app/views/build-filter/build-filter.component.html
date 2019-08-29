@@ -1,0 +1,38 @@
+<h1>Build a filter</h1>
+<div>
+  <input type="file" (change)="fileChanged($event)">
+</div>
+
+<br>
+
+<div *ngIf="kvpairs.length == 0" style="float:left">
+    <h3>Metadata Statistics</h3>
+    <div>Loading...</div>
+</div>
+
+<div *ngIf="kvpairs.length != 0" >
+    <div class="clr-row" clr-justify-content-around>
+        <div class="clr-col">
+      <clr-tree>
+        <clr-tree-node [clrSelected]="true" [clrExpanded]="true"><h3>Metadata Statistics</h3>
+          <clr-tree-node *ngFor="let kvpair of kvpairs"
+                          [clrSelected]="true"
+                          [clrExpanded]="false">
+                          {{kvpair.key}}
+            <clr-tree-node *ngFor="let value of kvpair.values" [clrSelected]="true">
+                {{value}} ({{getKVstatics(kvpair.key, value)}})
+            </clr-tree-node>
+          </clr-tree-node>
+        </clr-tree-node>
+      </clr-tree>
+      <br>
+      <button class="btn btn-primary" (click)="buildFilter()">Build Filter</button> 
+      <!-- <button class="btn btn-primary" (click)="exportFilter()">Export Filter</button> -->
+    </div>
+ 
+    
+  <div class="clr-col">
+    <h3>Selected Items:</h3>
+  
+  </div>
+</div>

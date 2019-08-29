@@ -2,7 +2,6 @@ import { Component, OnInit } from '@angular/core';
 import { GridOptions } from "ag-grid-community";
 import { saveAs } from 'file-saver';
 import { colDefs_Metadata } from '../../_models/grid-support'
-import { TestBed } from '@angular/core/testing';
 
 @Component({
   selector: 'app-metadata',
@@ -30,8 +29,8 @@ export class MetadataComponent implements OnInit {
     this.columnDefs = colDefs_Metadata;
     this.defaultColDef = {
       width: 150,
-		  filter: true,
-		  sortable: true
+      filter: true,
+      sortable: true
     }
     this.rowSelection = "multiple";
     this.rowGroupPanelShow = "always";
@@ -44,9 +43,9 @@ export class MetadataComponent implements OnInit {
   }
 
   fileChanged(e) {
-      this.filename = e.target.files[0];
-      console.log(this.filename)
-      this.loadDocument(this.filename);
+    this.filename = e.target.files[0];
+    console.log(this.filename)
+    this.loadDocument(this.filename);
       
   }
 
@@ -125,7 +124,7 @@ export class MetadataComponent implements OnInit {
         }
         newData["ruleid"] = index;
         newData["default"] = "Enabled";
-        newData["rule"] = ruleString.substr(1);
+        newData["rule"] = ruleString;
         // var newData = {
         //   ruleid: index,
         //   default: "Enabled",
