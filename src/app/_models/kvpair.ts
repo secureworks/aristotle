@@ -10,4 +10,6 @@ export class Kvrecord {
   value: string;
   enables: string[] = [];
   disables: string[] = [];
+  selected: boolean;
+  filterStr: string;
 }

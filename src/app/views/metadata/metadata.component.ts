@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { GridOptions } from "ag-grid-community";
-import { saveAs } from 'file-saver';
 import { colDefs_Metadata } from '../../_models/grid-support'
 
 @Component({
@@ -187,7 +186,7 @@ export class MetadataComponent implements OnInit {
   
   saveFile() {
     var require: any;
-    var FileSaver = require('file-saver');
+    let FileSaver = require('file-saver');
     var content = this.buildFileContent();
     var blob = new Blob([content], {type: "text/plain;charset=utf-8"});
     FileSaver.saveAs(blob, "out.txt");

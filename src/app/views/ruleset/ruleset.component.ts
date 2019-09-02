@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { GridOptions } from "ag-grid-community";
-import { saveAs } from 'file-saver';
+//import { saveAs } from 'file-saver';
 import { colDefs_Rules } from '../../_models/grid-support'
 
 @Component({
@@ -113,7 +113,7 @@ export class RulesetComponent implements OnInit {
   
   saveFile() {
     var require: any;
-    var FileSaver = require('file-saver');
+    let FileSaver = require('file-saver');
     var content = this.buildFileContent();
     var blob = new Blob([content], {type: "text/plain;charset=utf-8"});
     FileSaver.saveAs(blob, "out.txt");

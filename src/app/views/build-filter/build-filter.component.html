@@ -12,27 +12,72 @@
 
 <div *ngIf="kvpairs.length != 0" >
     <div class="clr-row" clr-justify-content-around>
-        <div class="clr-col">
-      <clr-tree>
-        <clr-tree-node [clrSelected]="true" [clrExpanded]="true"><h3>Metadata Statistics</h3>
-          <clr-tree-node *ngFor="let kvpair of kvpairs"
-                          [clrSelected]="true"
-                          [clrExpanded]="false">
-                          {{kvpair.key}}
-            <clr-tree-node *ngFor="let value of kvpair.values" [clrSelected]="true">
-                {{value}} ({{getKVstatics(kvpair.key, value)}})
+      <div class="clr-col-4">
+        <clr-tree>
+          <clr-tree-node [clrSelected]="false" [clrExpanded]="true"><h3>Metadata Statistics</h3>
+            <clr-tree-node *ngFor="let kvpair of kvpairs"
+                            [clrSelected]="false"
+                            [clrExpanded]="false">
+                            {{kvpair.key}}
+              <clr-tree-node *ngFor="let record of getKvrecordByK(kvpair.key)"
+                            [(clrSelected)]="record.selected"
+                            (clrSelectedChange)="record.selected = !!$event"
+                            (click)="showRules(record, record.filterStr)">
+                  {{record.value}} ({{showStatics(record)}})
+              </clr-tree-node>
             </clr-tree-node>
           </clr-tree-node>
-        </clr-tree-node>
-      </clr-tree>
-      <br>
-      <button class="btn btn-primary" (click)="buildFilter()">Build Filter</button> 
-      <!-- <button class="btn btn-primary" (click)="exportFilter()">Export Filter</button> -->
-    </div>
+        </clr-tree>
+        <br>
+        <button class="btn btn-primary" (click)="buildFilter()">Build Filter</button> 
+        <!-- <button class="btn btn-primary" (click)="exportFilter()">Export Filter Strings</button> -->
+      </div>
  
-    
-  <div class="clr-col">
-    <h3>Selected Items:</h3>
+      <div class="clr-col">
+        <h3>Selected Items:</h3>
+        <li *ngFor="let filterStr of getSelectedRecordStrs()">
+          <span>{{filterStr}}</span>
+        </li>
+
+       
+        <form clrForm clrLayout="vertical" [formGroup]="filterForm" (submit)="save()">
+          <clr-textarea-container>
+            <label><h3>Filter Settings:</h3></label>
+            <textarea rows="5" cols="50" maxlength="500" style="resize:both;" clrTextarea formControlName="filterStrs" required>
+            </textarea>
+          </clr-textarea-container>
+
+          <br>
+          <button class="btn btn-outline" type="button" (click)="resetForm()">Reset</button>
+          <button class="btn btn-primary" type="submit">Save Filter</button>
+        </form>
+
+        <div>
+          <h3>Ruleset: {{getSelectedKVStr()}}</h3>
+          <div *ngFor="let rule of lines">
+              <label>{{rule}}</label>
+          </div>
+          <ag-grid-angular
+            #metadataGrid
+            style="width: 100%; height: 800px;" 
+            class="ag-theme-balham"
+            [rowData]="rowData" 
+            [columnDefs]="columnDefs"
+            [autoGroupColumnDef]="autoGroupColumnDef"
+            [defaultColDef]="defaultColDef"
+            [suppressRowClickSelection]="true"
+            [groupSelectsChildren]="true"
+            [debug]="true"
+            [rowSelection]="rowSelection"
+            [rowGroupPanelShow]="rowGroupPanelShow"
+            [pivotPanelShow]="pivotPanelShow"
+            [enableRangeSelection]="true"
+            [pagination]="false"
+            (gridReady)="onGridReady($event)"
+          >
+          </ag-grid-angular>
+        </div>
+
   
   </div>
 </div>

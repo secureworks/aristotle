@@ -79,14 +79,14 @@ export class ParserService {
       
       
       // update the kvrecords
-      
-      let kvrecord = this.kvpairService.getKvrecordByKV(kvrecords, key, value);
+      let str = key.concat(" ").concat(value);
+      let kvrecord = this.kvpairService.getKvrecordByStr(kvrecords, str);
       if (kvrecord !== null) {
         if (rule.enabled) {
-          this.kvpairService.updateKvrecordEnables(kvrecord, rule.id);
+          this.kvpairService.updateKvrecordEnables(kvrecord, rule.sid);
         }
         else {
-          this.kvpairService.updateKvrecordDisables(kvrecord, rule.id);
+          this.kvpairService.updateKvrecordDisables(kvrecord, rule.sid);
         }
       }
       else {
@@ -94,11 +94,13 @@ export class ParserService {
         var newKvrecord = new Kvrecord();
         newKvrecord.key = key;
         newKvrecord.value = value;
+        newKvrecord.selected = false;
+        newKvrecord.filterStr = str;
         if (rule.enabled) {
-          newKvrecord.enables.push(rule.id);
+          newKvrecord.enables.push(rule.sid);
         }
         else {
-          newKvrecord.disables.push(rule.id);
+          newKvrecord.disables.push(rule.sid);
         }
         this.kvpairService.addKvrecord(kvrecords, newKvrecord);
       }

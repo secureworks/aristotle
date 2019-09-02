@@ -150,3 +150,43 @@ export const colDefs_Metadata: Array<Object> = [
   }
 ];
 
+export const colDefs_Kvpair: Array<Object> = [
+	{
+		headerName: "SID",
+		field: "rulesid",
+		width: 120,
+		checkboxSelection: function(params) {
+			return params.columnApi.getRowGroupColumns().length === 0;
+		},
+		headerCheckboxSelection: function(params) {
+			return params.columnApi.getRowGroupColumns().length === 0;
+		},
+		sortable: true,
+		sort: 'asc'
+	},
+	{
+		headerName: "Enabled",
+		field: "default",
+		width: 100,
+		filter: true,
+		sortable: true,
+		sort: 'desc',
+		// enterprise version: enableRowGroup: true,
+		cellStyle: function (params) {
+			if (params.value) {
+				return { backgroundColor: 'lightblue' };
+			}
+			else {
+					return { backgroundColor: 'red' };
+			}
+			
+		}
+  },
+  {
+    headerName: "Rule Details",
+    field: "rule",
+    width: 800,
+    autoHeight: true,
+    cellStyle: {'white-space': 'normal'}
+  }
+];

@@ -5,7 +5,6 @@ import { Observable, of } from 'rxjs';
   providedIn: 'root'
 })
 export class KvpairService {
-  
   constructor() { }
   
   // Retrieve Kvpair by key
@@ -23,7 +22,18 @@ export class KvpairService {
   //   return of(kvpairs.find(kvpair => kvpair.key === key));
   // }
 
-  // Retrieve Kvpair by key
+  // Retrieve a list of Kvrecords by key
+  getKvrecordByK(kvrecords: Kvrecord[], key: string): Kvrecord[] {
+    var newKvrecords: Kvrecord[] = [];
+    for (var i = 0; i < kvrecords.length; i++) {
+      if (kvrecords[i].key === key) {
+        newKvrecords.push(kvrecords[i]);
+      }
+    }
+    return newKvrecords;
+  }
+
+  // Retrieve Kvrecord by key & value
   getKvrecordByKV(kvrecords: Kvrecord[], key: string, value: string): Kvrecord {
     for (var i = 0; i < kvrecords.length; i++) {
       if (kvrecords[i].key === key && kvrecords[i].value === value) {
@@ -31,6 +41,28 @@ export class KvpairService {
       }
     }
     return null;
+  }
+
+  // Retrieve Kvrecord by filterStr which is in format of "key value"
+  // this should be quick than getKvrecordByKV since there are only one cpmparison
+  getKvrecordByStr(kvrecords: Kvrecord[], filterStr: string): Kvrecord {
+    for (var i = 0; i < kvrecords.length; i++) {
+      if (kvrecords[i].filterStr === filterStr) {
+        return kvrecords[i];
+      }
+    }
+    return null;
+  }
+
+  // Retrieve a list of Kvrecords that has been selected
+  getKvrecordSelected(kvrecords: Kvrecord[]): Kvrecord[] {
+    var newKvrecords: Kvrecord[] = [];
+    for (var i = 0; i < kvrecords.length; i++) {
+      if (kvrecords[i].selected) {
+        newKvrecords.push(kvrecords[i]);
+      }
+    }
+    return newKvrecords;
   }
 
   // Add a new Kvpair
@@ -55,38 +87,38 @@ export class KvpairService {
     return true;
   }
 
-  updateKvrecordEnables(kvrecord: Kvrecord, id: string): boolean {
-    kvrecord.enables.push(id);
+  updateKvrecordEnables(kvrecord: Kvrecord, sid: string): boolean {
+    kvrecord.enables.push(sid);
     return true;
   }
 
-  updateKvrecordDisables(kvrecord: Kvrecord, id: string): boolean {
-    kvrecord.disables.push(id);
+  updateKvrecordDisables(kvrecord: Kvrecord, sid: string): boolean {
+    kvrecord.disables.push(sid);
     return true;
   }
 
   // Updata a Kvrecord, change a sid from enables list to disables list
-  // rule id is unique, if use sid, then sid needs to be unique
-  updateKvrecordE2D(kvrecord: Kvrecord, id: string): boolean {
+  // assume sid is unique
+  updateKvrecordE2D(kvrecord: Kvrecord, sid: string): boolean {
     for (var i =0; i < kvrecord.enables.length; i++) {
-      if (kvrecord.enables[i] === id) {
+      if (kvrecord.enables[i] === sid) {
         kvrecord.enables.splice(i,1);
       }
     }
-    kvrecord.disables.push(id);
+    kvrecord.disables.push(sid);
     
     return true;
   }
 
   // Updata a Kvrecord, change a sid from disables list to enables list
-  // rule id is unique, if use sid, then sid needs to be unique
-  updateKvrecordD2E(kvrecord: Kvrecord, id: string): boolean {
+  // assume sid is unique
+  updateKvrecordD2E(kvrecord: Kvrecord, sid: string): boolean {
     for (var i =0; i < kvrecord.disables.length; i++) {
-      if (kvrecord.disables[i] === id) {
+      if (kvrecord.disables[i] === sid) {
         kvrecord.disables.splice(i,1);
       }
     }
-    kvrecord.enables.push(id);
+    kvrecord.enables.push(sid);
     
     return true;
   }
