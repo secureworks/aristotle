@@ -47,10 +47,10 @@ export class ParserService {
     // a set of key-value for this rule
     var ruleKvpairs: Kvpair[] = [];
     // get key-value pairs
-    var pairs = mString.split(", ");
+    var pairs = mString.split(",");
     for(var i = 0; i < pairs.length; i++) {
-      var key = pairs[i].split(" ")[0];
-      var value = pairs[i].split(" ")[1];
+      var key = pairs[i].trim().split(" ")[0];
+      var value = pairs[i].trim().split(" ")[1];
       // update this rule's metadata, 
       let ruleKvpair = this.kvpairService.getKvpairByKey(ruleKvpairs, key);
       if (ruleKvpair !== null) {

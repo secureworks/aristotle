@@ -66,9 +66,9 @@ export class MetadataComponent implements OnInit {
 
   getKeys (mString) {
     // get key-value pairs
-    var pairs = mString.split(", ");
+    var pairs = mString.split(",");
     for(var i = 0; i < pairs.length; i++) {
-      var key = pairs[i].split(" ")[0];
+      var key = pairs[i].trim().split(" ")[0];
       if (!this.keys.includes(key)) {
         // console.log(key);
         this.keys.push(key);
@@ -77,14 +77,14 @@ export class MetadataComponent implements OnInit {
   }
 
   getKeyValues(mString) {
-    var pairs = mString.split(", ");
+    var pairs = mString.split(",");
     var keyValues = {};
     // there is multiple entry for same key
     // keyValues[ pairs[0] ] = pairs[1];
     for(var i = 0; i < pairs.length; i++) {
       
-      var key = pairs[i].split(" ")[0];
-      var value = pairs[i].split(" ")[1];
+      var key = pairs[i].trim().split(" ")[0];
+      var value = pairs[i].trim().split(" ")[1];
       if (!(key in keyValues)) {
         keyValues[key] = value;
       }
