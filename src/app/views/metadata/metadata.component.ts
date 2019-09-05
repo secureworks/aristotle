@@ -16,13 +16,14 @@ export class MetadataComponent implements OnInit {
   private gridApi;
   private gridColumnApi;
 
-  private columnDefs;
-  // private autoGroupColumnDef;
-  private defaultColDef;
-  private rowSelection;
-  private rowGroupPanelShow;
-  private pivotPanelShow;
-  private rowData: any[];
+  public columnDefs;
+  public autoGroupColumnDef;
+  public defaultColDef;
+  public rowSelection;
+  public rowGroupPanelShow;
+  public pivotPanelShow;
+  public rowData: any[];
+  public lines;
 
   constructor() {
     this.columnDefs = colDefs_Metadata;
