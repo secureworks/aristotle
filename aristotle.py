@@ -80,6 +80,7 @@ def print_warning(msg):
     aristotle_logger.warning(INVERSE + YELLOW + "WARNING:" + RESET + YELLOW + " %s" % msg + RESET)
 
 class Ruleset():
+    # TODO: use a Rule class instead of dicts?
     # dict keys are sids
     metadata_dict = {}
     # dict keys are keys from metadata key-value pairs
@@ -223,9 +224,9 @@ class Ruleset():
         if not filter:
             filter = self.filter
         # the boolean.py library uses tokenize which isn't designed to
-        # handle multiline tokens (and doesn't support quoting). So
+        # handle multi-word tokens (and doesn't support quoting). So
         # just replace and map to single word. This way we can still
-        # leverage boolean.py to do simplifying building the tree.
+        # leverage boolean.py to do simplifying and building of the tree.
         mytokens = re.findall(r'\x22[a-zA-Z0-9_]+\s[^\x22]+\x22', filter, re.DOTALL)
         if not mytokens or len(mytokens) == 0:
             # nothing to filter on ... why go on living?
@@ -251,7 +252,7 @@ class Ruleset():
             print_error("Problem processing filter string:\n\n%s\n\nError:\n%s" % (filter, e), fatal=True)
 
     def print_header(self):
-        """ prints vanity header and stats """
+        """ prints vanity header and global stats """
         total = len(self.metadata_dict)
         enabled = len([sid for sid in self.metadata_dict.keys() \
                     if not self.metadata_dict[sid]['disabled']])
@@ -350,6 +351,9 @@ def main():
     else:
         aristotle_logger.setLevel(logging.INFO)
 
+    if args.stats is None and args.filter is None:
+        print_error("'filter' or 'stats' option required. Neither is defined.", fatal=True)
+
     if args.stats is not None:
         keys = []
         keyonly = False
@@ -377,6 +381,7 @@ def main():
 
     results = rs.filter_ruleset()
 
+    # for now, just print list of matching sids
     print(results)
     print("Total: %d" % len(results))
 
