@@ -167,12 +167,16 @@ class Ruleset():
 
                 for kvpair in metadata_str.split(','):
                     # key-value pairs are case insensitive; make everything lower case
-                    kvsplit = kvpair.lower().strip().split(' ', 1)
+                    # also remove extra spaces before, after, and between key and value
+                    kvsplit = [e.strip() for e in kvpair.lower().strip().split(' ', 1)]
                     if len(kvsplit) < 2:
                         # just a single word in metadata; warning? skip?
                         print_warning("Single word metatdata value found: %s" % kvsplit)
                         continue
                     k, v = kvsplit
+                    if k == "sid" and int(v) != sid:
+                        # this is in violation of the schema, should we error and die?
+                        print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'.".format(lineno, v, sid))
                     # populate metadata_dict
                     if k not in self.metadata_dict[sid]['metadata'].keys():
                         self.metadata_dict[sid]['metadata'][k] = []
@@ -183,10 +187,12 @@ class Ruleset():
                     if v not in self.keys_dict[k].keys():
                         self.keys_dict[k][v] = []
                     self.keys_dict[k][v].append(sid)
-
+                # add sid as pseudo metadata key
+                self.metadata_dict[sid]['metadata']['sid'] = [sid]
+                self.keys_dict['sid'] = {'sid': [sid]}
                 lineno += 1
-            #print_debug("metadata_dict:\n%s" % metadata_dict)
-            #print_debug("keys_dict:\n%s" % keys_dict)
+            #print_debug("metadata_dict:\n%s" % self.metadata_dict)
+            #print_debug("keys_dict:\n%s" % self.keys_dict)
 
         except Exception as e:
             print_error("Problem loading rules: %s" % (e), fatal=True)
@@ -275,6 +281,8 @@ class Ruleset():
         for t in mytokens:
             # key-value pairs are case insensitive; make everything lower case
             tstrip = t.strip('"').lower()
+            # also remove extra spaces before, after, and between key and value
+            tstrip = ' '.join([e.strip() for e in tstrip.strip().split(' ', 1)])
             print_debug(tstrip)
             # if token begins with digit, the tokenizer doesn't like it
             hashstr = "D" + hashlib.md5(tstrip.encode()).hexdigest()
