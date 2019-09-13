@@ -35,15 +35,15 @@ import sys
 # e.g. logger = logging.getLogger("aristotle")
 aristotle_logger = logging.getLogger("aristotle")
 
-# If no logging configured then Python >= version 3.2 will  log level WARNING
+# If no logging configured then Python >= version 3.2 will log level WARNING
 # to logging.lastResort (default sys.stderr);  With Python < 3.2, will
 # generate an error so adding NullHander in that case (logs will go nowhere).
 # If this program is run from command line, a  logging.StreamHandler()
 # handler is added. But if using as library, be sure to add a hander (and
-# formatter if desired) to logger "aristotle".
+# formatter if desired) to logger "aristotle", e.g.:
 #     logger = logging.getLogger("aristotle")
 #     logger.addHandler(logging.StreamHandler())
-# https://docs.python.org/3/howto/logging.html#what-happens-if-no-configuration-is-provided
+# Ref: https://docs.python.org/3/howto/logging.html#what-happens-if-no-configuration-is-provided
 if (sys.version_info < (3, 2)):
     aristotle_logger.addHandler(logging.NullHandler())
 
@@ -200,13 +200,43 @@ class Ruleset():
         # TODO: support less/greater than for CVE numbers?
         k, v = kvpair.split(' ', 1)
         retarray = []
-        if k not in self.keys_dict.keys():
-            print_warning("metadata key '%s' not found in ruleset" % k)
+        if k == "sid":
+            try:
+                retarray.append(int(v))
+            except Exception as e:
+                try:
+                    lbound = -1
+                    ubound = float('inf')
+                    offset = 1
+                    if v.startswith('<'):
+                        if v[offset] == '=':
+                            offset += 1
+                        ubound = int(v[offset:])
+                        ubound += (offset - 1)
+                    elif v.startswith('>'):
+                        if v[offset] == '=':
+                            offset += 1
+                        lbound = int(v[offset:])
+                        lbound -= (offset - 1)
+                    else:
+                        temp_array = [n.strip() for n in v.split('-')]
+                        if len(temp_array) != 2:
+                            raise Exception("Bad sid range provided in filter; should use format 'nnn-mmm'")
+                        # range is inclusive
+                        lbound = int(temp_array[0]) - 1
+                        ubound = int(temp_array[1]) + 1
+                    #print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
+                    retarray = [s for s in self.metadata_dict.keys() if (s < ubound and s > lbound) and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                except Exception as e:
+                    print_error("Unable to parse 'sid' value '%s':\n%s" % (v, e), fatal=True)
         else:
-            if v not in self.keys_dict[k]:
-                print_warning("metadata key-value pair '%s' not found in ruleset" % kvpair)
+            if k not in self.keys_dict.keys():
+                print_warning("metadata key '%s' not found in ruleset" % k)
             else:
-                retarray = [s for s in self.keys_dict[k][v] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                if v not in self.keys_dict[k]:
+                    print_warning("metadata key-value pair '%s' not found in ruleset" % kvpair)
+                else:
+                    retarray = [s for s in self.keys_dict[k][v] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
         if negate:
             # if key or value not found, this will be all rules
             retarray = list(frozenset(self.get_all_sids()) - frozenset(retarray))
