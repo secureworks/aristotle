@@ -95,7 +95,7 @@ class Ruleset():
     # dict keys are sids
     metadata_dict = {}
     # dict keys are keys from metadata key-value pairs
-    keys_dict = {}
+    keys_dict = {'sid': {}}
     # dict keys are hash of key-value pairs from passed in filter string/file
     metadata_map = {}
 
@@ -170,7 +170,7 @@ class Ruleset():
                     kvsplit = [e.strip() for e in kvpair.lower().strip().split(' ', 1)]
                     if len(kvsplit) < 2:
                         # just a single word in metadata. warn and skip
-                        print_warning("Single word metatdata value found, ignoring '{}' in sid {}".format(kvpair, sid))
+                        print_warning("Single word metadata value found, ignoring '{}' in sid {}".format(kvpair, sid))
                         continue
                     k, v = kvsplit
                     if k == "sid" and int(v) != sid:
@@ -189,10 +189,10 @@ class Ruleset():
                 # add sid as pseudo metadata key unless it already exist
                 if 'sid' not in self.metadata_dict[sid]['metadata'].keys():
                     self.metadata_dict[sid]['metadata']['sid'] = [sid]
-                    self.keys_dict['sid'] = {'sid': [sid]}
+                    self.keys_dict['sid'][sid] = [sid]
                 lineno += 1
-            #print_debug("metadata_dict:\n%s" % self.metadata_dict)
-            #print_debug("keys_dict:\n%s" % self.keys_dict)
+            print_debug("metadata_dict:\n%s" % self.metadata_dict)
+            print_debug("keys_dict:\n%s" % self.keys_dict)
 
         except Exception as e:
             print_error("Problem loading rules: %s" % (e), fatal=True)
@@ -206,44 +206,60 @@ class Ruleset():
         # TODO: support less/greater than for CVE numbers?
         k, v = kvpair.split(' ', 1)
         retarray = []
-        if k == "sid":
-            try:
-                retarray.append(int(v))
-            except Exception as e:
+        # these keys support '>', '<', '>=', and '<='
+        rangekeys = ['sid',
+                     'cve',
+                     'cvss_v2_base',
+                     'cvss_v2_temporal',
+                     'cvss_v3_base',
+                     'cvss_v3_temporal',
+                     'created_at',
+                     'updated_at']
+        if k in rangekeys and (v.startswith('<') or v.startswith('>')) and v != "<all>":
+
+            if k == "cve":
+                # TODO: handle cve; format is YYYY-<sequence_number>
+                pass
+            elif k in ["created_at", "updated_at"]:
+                # TODO: parse/treat as datetimeobjects
+                pass
+            else:
+                # handle everything else as a float
                 try:
-                    lbound = -1
+                    lbound = float('-inf')
                     ubound = float('inf')
                     offset = 1
                     if v.startswith('<'):
                         if v[offset] == '=':
                             offset += 1
-                        ubound = int(v[offset:])
-                        ubound += (offset - 1)
-                    elif v.startswith('>'):
+                        ubound = float(v[offset:])
+                        ubound += (float(offset) - 1.0)
+                    else: # v.startswith('>'):
                         if v[offset] == '=':
                             offset += 1
-                        lbound = int(v[offset:])
-                        lbound -= (offset - 1)
-                    else:
-                        temp_array = [n.strip() for n in v.split('-')]
-                        if len(temp_array) != 2:
-                            raise Exception("Bad sid range provided in filter; should use format 'nnn-mmm'")
-                        # range is inclusive
-                        lbound = int(temp_array[0]) - 1
-                        ubound = int(temp_array[1]) + 1
-                    #print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
-                    retarray = [s for s in self.metadata_dict.keys() if (s < ubound and s > lbound) and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                        lbound = float(v[offset:])
+                        lbound -= (float(offset) - 1.0)
+                    print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
+                    retarray = [s for s in self.metadata_dict.keys() \
+                                  for val in self.metadata_dict[s]["metadata"][k]
+                                    if (float(val) < float(ubound) and float(val) > float(lbound)) and \
+                                    (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 except Exception as e:
-                    print_error("Unable to parse 'sid' value '%s':\n%s" % (v, e), fatal=True)
+                    print_error("Unable to parse '{}' value '{}' as int:\n{}".format(k, v, e), fatal=True)
+
+
+
+
+
         else:
             if k not in self.keys_dict.keys():
-                print_warning("metadata key '%s' not found in ruleset" % k)
+                print_warning("metadata key '{}' not found in ruleset".format(k))
             else:
                 # special keyword '<all>' means all values for that key
                 if v == "<all>":
-                    retarray = [s for v in self.keys_dict[k].keys() for s in self.keys_dict[k][v] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                    retarray = [s for val in self.keys_dict[k].keys() for s in self.keys_dict[k][val] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 elif v not in self.keys_dict[k]:
-                    print_warning("metadata key-value pair '%s' not found in ruleset" % kvpair)
+                    print_warning("metadata key-value pair '{}' not found in ruleset".format(kvpair))
                 else:
                     retarray = [s for s in self.keys_dict[k][v] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
         if negate:
