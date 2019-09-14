@@ -119,7 +119,6 @@ class Ruleset():
             print_error("Unable to process filter '%s':\n%s" % (filter, e), fatal=True)
 
         self.outfile = outfile
-        self.outfile = outfile
         self.include_disabled_rules = include_disabled_rules
 
         self.parse_rules()
@@ -170,8 +169,8 @@ class Ruleset():
                     # also remove extra spaces before, after, and between key and value
                     kvsplit = [e.strip() for e in kvpair.lower().strip().split(' ', 1)]
                     if len(kvsplit) < 2:
-                        # just a single word in metadata; warning? skip?
-                        print_warning("Single word metatdata value found: %s" % kvsplit)
+                        # just a single word in metadata. warn and skip
+                        print_warning("Single word metatdata value found, ignoring '{}' in sid {}".format(kvpair, sid))
                         continue
                     k, v = kvsplit
                     if k == "sid" and int(v) != sid:
@@ -278,9 +277,9 @@ class Ruleset():
         # handle multi-word tokens (and doesn't support quoting). So
         # just replace and map to single word. This way we can still
         # leverage boolean.py to do simplifying and building of the tree.
-        mytokens = re.findall(r'\x22[a-zA-Z0-9_]+\s[^\x22]+\x22', filter, re.DOTALL)
+        mytokens = re.findall(r'\x22[a-zA-Z0-9_]+[^\x22]+\x22', filter, re.DOTALL)
         if not mytokens or len(mytokens) == 0:
-            # nothing to filter on ... why go on living?
+            # nothing to filter on so exit
             print_error("filter string contains no tokens", fatal=True)
         for t in mytokens:
             # key-value pairs are case insensitive; make everything lower case
@@ -288,6 +287,9 @@ class Ruleset():
             # also remove extra spaces before, after, and between key and value
             tstrip = ' '.join([e.strip() for e in tstrip.strip().split(' ', 1)])
             print_debug(tstrip)
+            if len(tstrip.split(' ')) == 1:
+                # if just key provided (no value), match on all values
+                tstrip = "{} <all>".format(tstrip)
             # if token begins with digit, the tokenizer doesn't like it
             hashstr = "D" + hashlib.md5(tstrip.encode()).hexdigest()
             # add to mapp dict
