@@ -176,7 +176,7 @@ class Ruleset():
                     k, v = kvsplit
                     if k == "sid" and int(v) != sid:
                         # this is in violation of the schema, should we error and die?
-                        print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'.".format(lineno, v, sid))
+                        print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'. This may lead to unexpected results".format(lineno, v, sid))
                     # populate metadata_dict
                     if k not in self.metadata_dict[sid]['metadata'].keys():
                         self.metadata_dict[sid]['metadata'][k] = []
@@ -187,9 +187,10 @@ class Ruleset():
                     if v not in self.keys_dict[k].keys():
                         self.keys_dict[k][v] = []
                     self.keys_dict[k][v].append(sid)
-                # add sid as pseudo metadata key
-                self.metadata_dict[sid]['metadata']['sid'] = [sid]
-                self.keys_dict['sid'] = {'sid': [sid]}
+                # add sid as pseudo metadata key unless it already exist
+                if 'sid' not in self.metadata_dict[sid]['metadata'].keys():
+                    self.metadata_dict[sid]['metadata']['sid'] = [sid]
+                    self.keys_dict['sid'] = {'sid': [sid]}
                 lineno += 1
             #print_debug("metadata_dict:\n%s" % self.metadata_dict)
             #print_debug("keys_dict:\n%s" % self.keys_dict)
@@ -239,7 +240,10 @@ class Ruleset():
             if k not in self.keys_dict.keys():
                 print_warning("metadata key '%s' not found in ruleset" % k)
             else:
-                if v not in self.keys_dict[k]:
+                # special keyword '<all>' means all values for that key
+                if v == "<all>":
+                    retarray = [s for v in self.keys_dict[k].keys() for s in self.keys_dict[k][v] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                elif v not in self.keys_dict[k]:
                     print_warning("metadata key-value pair '%s' not found in ruleset" % kvpair)
                 else:
                     retarray = [s for s in self.keys_dict[k][v] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
