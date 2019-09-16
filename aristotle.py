@@ -25,6 +25,8 @@ Suricata and Snort rulesets based on metadata keyword values.
 
 import argparse
 import boolean
+import datetime
+from dateutil.parser import parse as dateparse
 import hashlib
 import logging
 import os
@@ -201,9 +203,6 @@ class Ruleset():
         return [s for s in self.metadata_dict.keys() if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
 
     def get_sids(self, kvpair, negate=False):
-        # TODO: handle key ALL situation
-        # TODO: support date ranges for created_at and updated_at
-        # TODO: support less/greater than for CVE numbers?
         k, v = kvpair.split(' ', 1)
         retarray = []
         # these keys support '>', '<', '>=', and '<='
@@ -221,8 +220,28 @@ class Ruleset():
                 # TODO: handle cve; format is YYYY-<sequence_number>
                 pass
             elif k in ["created_at", "updated_at"]:
-                # TODO: parse/treat as datetimeobjects
-                pass
+                # parse/treat as datetime objects
+                try:
+                    lbound = datetime.datetime.min
+                    ubound = datetime.datetime.max
+                    offset = 1
+                    if v.startswith('<'):
+                        if v[offset] == '=':
+                            offset += 1
+                        ubound = dateparse(v[offset:])
+                        ubound += datetime.timedelta(days=(offset - 1))
+                    else: # v.startswith('>'):
+                        if v[offset] == '=':
+                            offset += 1
+                        lbound = dateparse(v[offset:])
+                        lbound -= datetime.timedelta(days=(offset - 1))
+                    print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
+                    retarray = [s for s in self.metadata_dict.keys() \
+                                  for val in self.metadata_dict[s]["metadata"][k]
+                                    if (dateparse(val) < ubound and dateparse(val) > lbound) and \
+                                    (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                except Exception as e:
+                    print_error("Unable to process '{}' value '{}' (as datetime):\n{}".format(k, v, e), fatal=True)
             else:
                 # handle everything else as a float
                 try:
@@ -245,12 +264,7 @@ class Ruleset():
                                     if (float(val) < float(ubound) and float(val) > float(lbound)) and \
                                     (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 except Exception as e:
-                    print_error("Unable to parse '{}' value '{}' as int:\n{}".format(k, v, e), fatal=True)
-
-
-
-
-
+                    print_error("Unable to process '{}' value '{}' (as float):\n{}".format(k, v, e), fatal=True)
         else:
             if k not in self.keys_dict.keys():
                 print_warning("metadata key '{}' not found in ruleset".format(k))
