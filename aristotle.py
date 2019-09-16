@@ -199,11 +199,49 @@ class Ruleset():
         except Exception as e:
             print_error("Problem loading rules: %s" % (e), fatal=True)
 
+    def cve_compare(self, left_val, right_val, cmp_operator):
+        """ Compare CVE values given comparison operator.
+            May have unexpected results if CVE values (left_val,
+            right_val) not formatted as CVE numbers
+        """
+        print_debug("cve_compare() called. left_val: {}, right_val: {}, cmp_operator: {}".format(left_val, right_val, cmp_operator))
+        try:
+            # TODO: when no seq number, set according to operator
+            if '-' not in left_val:
+                lyear = int(left_val)
+                lseq = 0
+            else:
+                lyear, lseq = [int(v) for v in left_val.split('-', 1)]
+            if '-' not in right_val:
+                ryear = int(right_val)
+                rseq = 0
+            else:
+                ryear, rseq = [int(v) for v in right_val.split('-', 1)]
+            if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                if cmp_operator[0] == '<':
+                    rseq += 1
+                else:
+                    lseq += 1
+            print_debug("lyear: {}, lseq: {}  ...  ryear: {}, rseq: {}".format(lyear,lseq,ryear,rseq))
+            if cmp_operator[0] == '<':
+                if lyear == ryear:
+                    return lseq < rseq
+                else:
+                    return lyear < ryear
+            if cmp_operator[0] == '>':
+                if lyear == ryear:
+                    return lseq > rseq
+                else:
+                    return lyear > ryear
+            return False
+        except Exception as e:
+            print_error("Unable to do CVE comparison '{} {} {}':\n{}".format(left_val, cmp_operator, right_val, e), fatal=True)
+
     def get_all_sids(self):
         return [s for s in self.metadata_dict.keys() if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
 
     def get_sids(self, kvpair, negate=False):
-        k, v = kvpair.split(' ', 1)
+        k, v = [e.strip() for e in kvpair.split(' ', 1)]
         retarray = []
         # these keys support '>', '<', '>=', and '<='
         rangekeys = ['sid',
@@ -215,10 +253,24 @@ class Ruleset():
                      'created_at',
                      'updated_at']
         if k in rangekeys and (v.startswith('<') or v.startswith('>')) and v != "<all>":
-
+            if len(v) < 2:
+                print_error("Invalid value '{}' for key '{}'.".format(v, k), fatal=True)
             if k == "cve":
-                # TODO: handle cve; format is YYYY-<sequence_number>
-                pass
+                # handle cve ranges; format is YYYY-<sequence_number>
+                print_debug("key: {}, value: {}".format(k, v))
+                try:
+                    offset = 1
+                    if v[1] == '=':
+                        offset += 1
+                    cmp_operator = v[:offset]
+                    cve_val = v[offset:].strip()
+                    print_debug("cmp_operator: {}, cve_val: {}".format(cmp_operator, cve_val))
+                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()] \
+                                  for val in self.metadata_dict[s]["metadata"][k] \
+                                    if self.cve_compare(left_val=val, right_val=cve_val, cmp_operator=cmp_operator) and \
+                                    (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                except Exception as e:
+                    print_error("Unable to process key '{}' value '{}' (as CVE number):\n{}".format(k, v, e), fatal=True)
             elif k in ["created_at", "updated_at"]:
                 # parse/treat as datetime objects
                 try:
@@ -228,16 +280,16 @@ class Ruleset():
                     if v.startswith('<'):
                         if v[offset] == '=':
                             offset += 1
-                        ubound = dateparse(v[offset:])
+                        ubound = dateparse(v[offset:].strip())
                         ubound += datetime.timedelta(microseconds=(offset - 1))
                     else: # v.startswith('>'):
                         if v[offset] == '=':
                             offset += 1
-                        lbound = dateparse(v[offset:])
+                        lbound = dateparse(v[offset:].strip())
                         lbound -= datetime.timedelta(microseconds=(offset - 1))
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
-                    retarray = [s for s in self.metadata_dict.keys() \
-                                  for val in self.metadata_dict[s]["metadata"][k]
+                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()] \
+                                  for val in self.metadata_dict[s]["metadata"][k] \
                                     if (dateparse(val) < ubound and dateparse(val) > lbound) and \
                                     (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 except Exception as e:
@@ -251,16 +303,16 @@ class Ruleset():
                     if v.startswith('<'):
                         if v[offset] == '=':
                             offset += 1
-                        ubound = float(v[offset:])
+                        ubound = float(v[offset:].strip())
                         ubound += (float(offset) - 1.0)
                     else: # v.startswith('>'):
                         if v[offset] == '=':
                             offset += 1
-                        lbound = float(v[offset:])
+                        lbound = float(v[offset:].strip())
                         lbound -= (float(offset) - 1.0)
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
-                    retarray = [s for s in self.metadata_dict.keys() \
-                                  for val in self.metadata_dict[s]["metadata"][k]
+                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()] \
+                                  for val in self.metadata_dict[s]["metadata"][k] \
                                     if (float(val) < float(ubound) and float(val) > float(lbound)) and \
                                     (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 except Exception as e:
