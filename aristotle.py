@@ -93,7 +93,6 @@ def print_warning(msg):
     aristotle_logger.warning(INVERSE + YELLOW + "WARNING:" + RESET + YELLOW + " %s" % msg + RESET)
 
 class Ruleset():
-    # TODO: use a Rule class instead of dicts?
     # dict keys are sids
     metadata_dict = {}
     # dict keys are keys from metadata key-value pairs
@@ -204,7 +203,7 @@ class Ruleset():
             May have unexpected results if CVE values (left_val,
             right_val) not formatted as CVE numbers
         """
-        print_debug("cve_compare() called. left_val: {}, right_val: {}, cmp_operator: {}".format(left_val, right_val, cmp_operator))
+        #print_debug("cve_compare() called. left_val: {}, right_val: {}, cmp_operator: {}".format(left_val, right_val, cmp_operator))
         try:
             if '-' not in left_val:
                 lyear = int(left_val)
@@ -239,7 +238,7 @@ class Ruleset():
                     rseq += 1
                 else:
                     lseq += 1
-            print_debug("lyear: {}, lseq: {}  ...  ryear: {}, rseq: {}".format(lyear,lseq,ryear,rseq))
+            #print_debug("lyear: {}, lseq: {}  ...  ryear: {}, rseq: {}".format(lyear,lseq,ryear,rseq))
             if cmp_operator[0] == '<':
                 if lyear == ryear:
                     return lseq < rseq
@@ -274,7 +273,6 @@ class Ruleset():
                 print_error("Invalid value '{}' for key '{}'.".format(v, k), fatal=True)
             if k == "cve":
                 # handle cve ranges; format is YYYY-<sequence_number>
-                print_debug("key: {}, value: {}".format(k, v))
                 try:
                     offset = 1
                     if v[1] == '=':
@@ -352,7 +350,6 @@ class Ruleset():
 
     def evaluate(self, myobj):
         if myobj.isliteral:
-            #TODO: deal with "sid nnnn"
             if isinstance(myobj, boolean.boolean.NOT):
                 return self.get_sids(self.metadata_map[myobj.args[0].obj], negate=True)
             else:
