@@ -206,15 +206,32 @@ class Ruleset():
         """
         print_debug("cve_compare() called. left_val: {}, right_val: {}, cmp_operator: {}".format(left_val, right_val, cmp_operator))
         try:
-            # TODO: when no seq number, set according to operator
             if '-' not in left_val:
                 lyear = int(left_val)
-                lseq = 0
+                if cmp_operator[0] == '<':
+                    if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                        lseq = float('-inf')
+                    else:
+                        lseq = float('inf')
+                else:
+                    if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                        lseq = float('inf')
+                    else:
+                        lseq = float('-inf')
             else:
                 lyear, lseq = [int(v) for v in left_val.split('-', 1)]
             if '-' not in right_val:
                 ryear = int(right_val)
-                rseq = 0
+                if cmp_operator[0] == '<':
+                    if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                        rseq = float('inf')
+                    else:
+                        rseq = float('-inf')
+                else:
+                    if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                        rseq = float('-inf')
+                    else:
+                        rseq = float('inf')
             else:
                 ryear, rseq = [int(v) for v in right_val.split('-', 1)]
             if len(cmp_operator) > 1 and cmp_operator[1] == '=':
