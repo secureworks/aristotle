@@ -229,12 +229,12 @@ class Ruleset():
                         if v[offset] == '=':
                             offset += 1
                         ubound = dateparse(v[offset:])
-                        ubound += datetime.timedelta(days=(offset - 1))
+                        ubound += datetime.timedelta(microseconds=(offset - 1))
                     else: # v.startswith('>'):
                         if v[offset] == '=':
                             offset += 1
                         lbound = dateparse(v[offset:])
-                        lbound -= datetime.timedelta(days=(offset - 1))
+                        lbound -= datetime.timedelta(microseconds=(offset - 1))
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
                     retarray = [s for s in self.metadata_dict.keys() \
                                   for val in self.metadata_dict[s]["metadata"][k]
