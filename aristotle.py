@@ -52,6 +52,7 @@ if (sys.version_info < (3, 2)):
 disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B")
 sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
 metadata_keyword_re = re.compile(r"[\x28\x3B]\s*metadata\s*\x3A\s*(?P<METADATA>[^\x3B]+)\x3B")
+rule_msg_re = re.compile(r"[\s\x3B\x28]msg\s*\x3A\s*\x22(?P<MSG>[^\x22]+?)\x22\s*\x3B")
 
 if os.isatty(0) and sys.stdout.isatty():
     # ANSI colors; see https://en.wikipedia.org/wiki/ANSI_escape_code
@@ -100,7 +101,7 @@ class Ruleset():
     # dict keys are hash of key-value pairs from passed in filter string/file
     metadata_map = {}
 
-    def __init__(self, rules, filter="", outfile=None, include_disabled_rules=False):
+    def __init__(self, rules, metadata_filter="", outfile=None, include_disabled_rules=False):
         try:
             if os.path.isfile(rules):
                 with open(rules, 'r') as fh:
@@ -111,13 +112,13 @@ class Ruleset():
             print_error("Unable to process rules '%s':\n%s" % (rules, e), fatal=True)
 
         try:
-            if os.path.isfile(filter):
-                with open(filter, 'r') as fh:
-                    self.filter = fh.read()
+            if os.path.isfile(metadata_filter):
+                with open(metadata_filter, 'r') as fh:
+                    self.metadata_filter = fh.read()
             else:
-                self.filter = filter
+                self.metadata_filter = metadata_filter
         except Exception as e:
-            print_error("Unable to process filter '%s':\n%s" % (filter, e), fatal=True)
+            print_error("Unable to process metadata_filter '%s':\n%s" % (metadata_filter, e), fatal=True)
 
         self.outfile = outfile
         self.include_disabled_rules = include_disabled_rules
@@ -159,7 +160,8 @@ class Ruleset():
                 # build dict
                 self.metadata_dict[sid] = {'metadata': {},
                                       'disabled': False,
-                                      'default-disabled': False
+                                      'default-disabled': False,
+                                      'raw_rule': line
                                      }
                 if is_disabled_rule:
                     self.metadata_dict[sid]['disabled'] = True
@@ -346,7 +348,7 @@ class Ruleset():
         if negate:
             # if key or value not found, this will be all rules
             retarray = list(frozenset(self.get_all_sids()) - frozenset(retarray))
-        return retarray
+        return list(set(retarray))
 
     def evaluate(self, myobj):
         if myobj.isliteral:
@@ -366,17 +368,17 @@ class Ruleset():
             return retlist
 
     # process boolean string
-    def filter_ruleset(self, filter=None):
-        if not filter:
-            filter = self.filter
+    def filter_ruleset(self, metadata_filter=None):
+        if not metadata_filter:
+            metadata_filter = self.metadata_filter
         # the boolean.py library uses tokenize which isn't designed to
         # handle multi-word tokens (and doesn't support quoting). So
         # just replace and map to single word. This way we can still
         # leverage boolean.py to do simplifying and building of the tree.
-        mytokens = re.findall(r'\x22[a-zA-Z0-9_]+[^\x22]+\x22', filter, re.DOTALL)
+        mytokens = re.findall(r'\x22[a-zA-Z0-9_]+[^\x22]+\x22', metadata_filter, re.DOTALL)
         if not mytokens or len(mytokens) == 0:
             # nothing to filter on so exit
-            print_error("filter string contains no tokens", fatal=True)
+            print_error("metadata_filter string contains no tokens", fatal=True)
         for t in mytokens:
             # key-value pairs are case insensitive; make everything lower case
             tstrip = t.strip('"').lower()
@@ -391,16 +393,16 @@ class Ruleset():
             # add to mapp dict
             self.metadata_map[hashstr] = tstrip
             # replace in filter str
-            filter = filter.replace(t, hashstr)
+            metadata_filter = metadata_filter.replace(t, hashstr)
 
-        print_debug(filter)
+        print_debug(metadata_filter)
         try:
             algebra = boolean.BooleanAlgebra()
-            mytree = algebra.parse(filter).literalize().simplify()
+            mytree = algebra.parse(metadata_filter).literalize().simplify()
             return self.evaluate(mytree)
 
         except Exception as e:
-            print_error("Problem processing filter string:\n\n%s\n\nError:\n%s" % (filter, e), fatal=True)
+            print_error("Problem processing metadata_filter string:\n\n%s\n\nError:\n%s" % (metadata_filter, e), fatal=True)
 
     def print_header(self):
         """ prints vanity header and global stats """
@@ -439,6 +441,25 @@ class Ruleset():
                 print("\t%s (Total: %d; Enabled: %d; Disabled: %d)" % (ORANGE + value + RESET, total, enabled, disabled))
             print("")
 
+    def print_ruleset_summary(self, sids):
+        """ prints summary/truncated filtered ruleset to stdout
+        """
+        print_debug("print_ruleset_summary() called")
+        summary_max = 10
+        i = 0
+        while i < len(sids):
+            if i < summary_max:
+                matchobj = rule_msg_re.search(self.metadata_dict[sids[i]]['raw_rule'])
+                if not matchobj:
+                    print_warning("Unable to extract rule msg from '{}'.".format(self.metadata_dict[sids[i]]['raw_rule']))
+                    continue
+                msg = matchobj.group("MSG")
+                print msg
+            else:
+                break
+            i += 1
+        print("\n" + BLUE + "Showing {} of {} rules".format(i, len(sids)) + RESET + "\n")
+
 def main():
     global aristotle_logger
 
@@ -447,18 +468,26 @@ def main():
 
     # process command line args
     try:
-        parser = argparse.ArgumentParser()
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("-r", "--rules", "--ruleset",
                             action="store",
                             dest="rules",
                             required=True,
-                            help="path to rules file")
+                            help="path to rules file or string containing the ruleset")
         parser.add_argument("-f", "--filter",
                             action="store",
-                            dest="filter",
+                            dest="metadata_filter",
                             required=False,
                             default = None,
-                            help="boolean filter string or file containing it")
+                            help="Boolean filter string or path to a file containing it")
+        parser.add_argument("--summary",
+                            action="store_true",
+                            dest="summary_ruleset",
+                            required=False,
+                            default = False,
+                            help="output a summary of the filtered ruleset to stdout; \
+                                  if an output file is given, the full, filtered ruleset \
+                                  will still be written to it.")
         parser.add_argument("-o", "--output",
                             action="store",
                             dest="outfile",
@@ -473,7 +502,7 @@ def main():
                             default=None,
                             help="display ruleset statistics about specified key(s)")
         parser.add_argument("-i", "--include-disabled",
-                            action="store",
+                            action="store_true",
                             dest="include_disabled_rules",
                             required=False,
                             default=False,
@@ -502,8 +531,8 @@ def main():
     else:
         aristotle_logger.setLevel(logging.INFO)
 
-    if args.stats is None and args.filter is None:
-        print_error("'filter' or 'stats' option required. Neither is defined.", fatal=True)
+    if args.stats is None and args.metadata_filter is None:
+        print_error("'metadata_filter' or 'stats' option required. Neither is defined.", fatal=True)
 
     if args.stats is not None:
         keys = []
@@ -525,16 +554,32 @@ def main():
         sys.exit(0)
 
     # create object
-    rs = Ruleset(rules=args.rules, filter=args.filter,
+    rs = Ruleset(rules=args.rules, metadata_filter=args.metadata_filter,
                  outfile=args.outfile,
                  include_disabled_rules=args.include_disabled_rules)
 
+    filtered_sids = rs.filter_ruleset()
 
-    results = rs.filter_ruleset()
+    print_debug("filtered_sids: {}".format(filtered_sids))
 
-    # for now, just print list of matching sids
-    print(results)
-    print("Total: %d" % len(results))
+    # TODO: handle order because of/based on flowbits? Ideally IDS engine should handle...
+    #       see https://redmine.openinfosecfoundation.org/issues/1399
+    if args.outfile == "<stdout>":
+        if args.summary_ruleset:
+            rs.print_ruleset_summary(filtered_sids)
+        else:
+            for s in filtered_sids:
+                print("{}".format(rs.metadata_dict[s]['raw_rule']))
+    else:
+        if args.summary_ruleset:
+            rs.print_ruleset_summary(filtered_sids)
+        try:
+            with open(args.outfile, "w") as fh:
+                for s in filtered_sids:
+                    fh.write("{}\n".format(rs.metadata_dict[s]['raw_rule']))
+        except Exception as e:
+            print_error("Problem writing to file '{}':\n{}".format(args.outfile, e), fatal=True)
+        print(GREEN + "Wrote {} rules to file, '{}'".format(len(filtered_sids), args.outfile) + RESET + "\n")
 
 if __name__== "__main__":
     main()
