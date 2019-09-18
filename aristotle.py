@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Aristotle CLI - command line tool for slicing-and-dicing
+Aristotle CLI - command line tool for filtering
 Suricata and Snort rulesets based on metadata keyword values.
 """
 # Copyright 2019 Secureworks
@@ -17,14 +17,10 @@ Suricata and Snort rulesets based on metadata keyword values.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#
-# TODO: stats
-#       flowbits?
-#       use objects; make importable/lib
-#       command line option to enable disabled rules when evaluating?
-
 import argparse
 import boolean
+import datetime
+from dateutil.parser import parse as dateparse
 import hashlib
 import logging
 import os
@@ -50,6 +46,7 @@ if (sys.version_info < (3, 2)):
 disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B")
 sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
 metadata_keyword_re = re.compile(r"[\x28\x3B]\s*metadata\s*\x3A\s*(?P<METADATA>[^\x3B]+)\x3B")
+rule_msg_re = re.compile(r"[\s\x3B\x28]msg\s*\x3A\s*\x22(?P<MSG>[^\x22]+?)\x22\s*\x3B")
 
 if os.isatty(0) and sys.stdout.isatty():
     # ANSI colors; see https://en.wikipedia.org/wiki/ANSI_escape_code
@@ -91,34 +88,35 @@ def print_warning(msg):
     aristotle_logger.warning(INVERSE + YELLOW + "WARNING:" + RESET + YELLOW + " %s" % msg + RESET)
 
 class Ruleset():
-    # TODO: use a Rule class instead of dicts?
     # dict keys are sids
     metadata_dict = {}
     # dict keys are keys from metadata key-value pairs
-    keys_dict = {}
+    keys_dict = {'sid': {}}
     # dict keys are hash of key-value pairs from passed in filter string/file
     metadata_map = {}
 
-    def __init__(self, rules, filter="", outfile=None, include_disabled_rules=False):
+    def __init__(self, rules, metadata_filter="", outfile=None, include_disabled_rules=False):
         try:
             if os.path.isfile(rules):
                 with open(rules, 'r') as fh:
                     self.rules = fh.read()
             else:
+                if len(rules) < 256 and "metadata" not in rules:
+                    # probably a mis-typed filename
+                    print_error("'{}' is not a valid file and does not appear to be a string containing valid rule(s)".format(rules), fatal=True)
                 self.rules = rules
         except Exception as e:
             print_error("Unable to process rules '%s':\n%s" % (rules, e), fatal=True)
 
         try:
-            if os.path.isfile(filter):
-                with open(filter, 'r') as fh:
-                    self.filter = fh.read()
+            if os.path.isfile(metadata_filter):
+                with open(metadata_filter, 'r') as fh:
+                    self.metadata_filter = fh.read()
             else:
-                self.filter = filter
+                self.metadata_filter = metadata_filter
         except Exception as e:
-            print_error("Unable to process filter '%s':\n%s" % (filter, e), fatal=True)
+            print_error("Unable to process metadata_filter '%s':\n%s" % (metadata_filter, e), fatal=True)
 
-        self.outfile = outfile
         self.outfile = outfile
         self.include_disabled_rules = include_disabled_rules
 
@@ -159,7 +157,8 @@ class Ruleset():
                 # build dict
                 self.metadata_dict[sid] = {'metadata': {},
                                       'disabled': False,
-                                      'default-disabled': False
+                                      'default-disabled': False,
+                                      'raw_rule': line
                                      }
                 if is_disabled_rule:
                     self.metadata_dict[sid]['disabled'] = True
@@ -170,13 +169,13 @@ class Ruleset():
                     # also remove extra spaces before, after, and between key and value
                     kvsplit = [e.strip() for e in kvpair.lower().strip().split(' ', 1)]
                     if len(kvsplit) < 2:
-                        # just a single word in metadata; warning? skip?
-                        print_warning("Single word metatdata value found: %s" % kvsplit)
+                        # just a single word in metadata. warn and skip
+                        print_warning("Single word metadata value found, ignoring '{}' in sid {}".format(kvpair, sid))
                         continue
                     k, v = kvsplit
                     if k == "sid" and int(v) != sid:
                         # this is in violation of the schema, should we error and die?
-                        print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'.".format(lineno, v, sid))
+                        print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'. This may lead to unexpected results".format(lineno, v, sid))
                     # populate metadata_dict
                     if k not in self.metadata_dict[sid]['metadata'].keys():
                         self.metadata_dict[sid]['metadata'][k] = []
@@ -187,70 +186,169 @@ class Ruleset():
                     if v not in self.keys_dict[k].keys():
                         self.keys_dict[k][v] = []
                     self.keys_dict[k][v].append(sid)
-                # add sid as pseudo metadata key
-                self.metadata_dict[sid]['metadata']['sid'] = [sid]
-                self.keys_dict['sid'] = {'sid': [sid]}
+                # add sid as pseudo metadata key unless it already exist
+                if 'sid' not in self.metadata_dict[sid]['metadata'].keys():
+                    self.metadata_dict[sid]['metadata']['sid'] = [sid]
+                    self.keys_dict['sid'][sid] = [sid]
                 lineno += 1
-            #print_debug("metadata_dict:\n%s" % self.metadata_dict)
-            #print_debug("keys_dict:\n%s" % self.keys_dict)
+            print_debug("metadata_dict:\n%s" % self.metadata_dict)
+            print_debug("keys_dict:\n%s" % self.keys_dict)
 
         except Exception as e:
             print_error("Problem loading rules: %s" % (e), fatal=True)
+
+    def cve_compare(self, left_val, right_val, cmp_operator):
+        """ Compare CVE values given comparison operator.
+            May have unexpected results if CVE values (left_val,
+            right_val) not formatted as CVE numbers
+        """
+        #print_debug("cve_compare() called. left_val: {}, right_val: {}, cmp_operator: {}".format(left_val, right_val, cmp_operator))
+        try:
+            if '-' not in left_val:
+                lyear = int(left_val)
+                if cmp_operator[0] == '<':
+                    if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                        lseq = float('-inf')
+                    else:
+                        lseq = float('inf')
+                else:
+                    if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                        lseq = float('inf')
+                    else:
+                        lseq = float('-inf')
+            else:
+                lyear, lseq = [int(v) for v in left_val.split('-', 1)]
+            if '-' not in right_val:
+                ryear = int(right_val)
+                if cmp_operator[0] == '<':
+                    if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                        rseq = float('inf')
+                    else:
+                        rseq = float('-inf')
+                else:
+                    if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                        rseq = float('-inf')
+                    else:
+                        rseq = float('inf')
+            else:
+                ryear, rseq = [int(v) for v in right_val.split('-', 1)]
+            if len(cmp_operator) > 1 and cmp_operator[1] == '=':
+                if cmp_operator[0] == '<':
+                    rseq += 1
+                else:
+                    lseq += 1
+            #print_debug("lyear: {}, lseq: {}  ...  ryear: {}, rseq: {}".format(lyear,lseq,ryear,rseq))
+            if cmp_operator[0] == '<':
+                if lyear == ryear:
+                    return lseq < rseq
+                else:
+                    return lyear < ryear
+            if cmp_operator[0] == '>':
+                if lyear == ryear:
+                    return lseq > rseq
+                else:
+                    return lyear > ryear
+            return False
+        except Exception as e:
+            print_error("Unable to do CVE comparison '{} {} {}':\n{}".format(left_val, cmp_operator, right_val, e), fatal=True)
 
     def get_all_sids(self):
         return [s for s in self.metadata_dict.keys() if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
 
     def get_sids(self, kvpair, negate=False):
-        # TODO: handle key ALL situation
-        # TODO: support date ranges for created_at and updated_at
-        # TODO: support less/greater than for CVE numbers?
-        k, v = kvpair.split(' ', 1)
+        k, v = [e.strip() for e in kvpair.split(' ', 1)]
         retarray = []
-        if k == "sid":
-            try:
-                retarray.append(int(v))
-            except Exception as e:
+        # these keys support '>', '<', '>=', and '<='
+        rangekeys = ['sid',
+                     'cve',
+                     'cvss_v2_base',
+                     'cvss_v2_temporal',
+                     'cvss_v3_base',
+                     'cvss_v3_temporal',
+                     'created_at',
+                     'updated_at']
+        if k in rangekeys and (v.startswith('<') or v.startswith('>')) and v != "<all>":
+            if len(v) < 2:
+                print_error("Invalid value '{}' for key '{}'.".format(v, k), fatal=True)
+            if k == "cve":
+                # handle cve ranges; format is YYYY-<sequence_number>
                 try:
-                    lbound = -1
+                    offset = 1
+                    if v[1] == '=':
+                        offset += 1
+                    cmp_operator = v[:offset]
+                    cve_val = v[offset:].strip()
+                    print_debug("cmp_operator: {}, cve_val: {}".format(cmp_operator, cve_val))
+                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()] \
+                                  for val in self.metadata_dict[s]["metadata"][k] \
+                                    if self.cve_compare(left_val=val, right_val=cve_val, cmp_operator=cmp_operator) and \
+                                    (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                except Exception as e:
+                    print_error("Unable to process key '{}' value '{}' (as CVE number):\n{}".format(k, v, e), fatal=True)
+            elif k in ["created_at", "updated_at"]:
+                # parse/treat as datetime objects
+                try:
+                    lbound = datetime.datetime.min
+                    ubound = datetime.datetime.max
+                    offset = 1
+                    if v.startswith('<'):
+                        if v[offset] == '=':
+                            offset += 1
+                        ubound = dateparse(v[offset:].strip())
+                        ubound += datetime.timedelta(microseconds=(offset - 1))
+                    else: # v.startswith('>'):
+                        if v[offset] == '=':
+                            offset += 1
+                        lbound = dateparse(v[offset:].strip())
+                        lbound -= datetime.timedelta(microseconds=(offset - 1))
+                    print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
+                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()] \
+                                  for val in self.metadata_dict[s]["metadata"][k] \
+                                    if (dateparse(val) < ubound and dateparse(val) > lbound) and \
+                                    (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                except Exception as e:
+                    print_error("Unable to process '{}' value '{}' (as datetime):\n{}".format(k, v, e), fatal=True)
+            else:
+                # handle everything else as a float
+                try:
+                    lbound = float('-inf')
                     ubound = float('inf')
                     offset = 1
                     if v.startswith('<'):
                         if v[offset] == '=':
                             offset += 1
-                        ubound = int(v[offset:])
-                        ubound += (offset - 1)
-                    elif v.startswith('>'):
+                        ubound = float(v[offset:].strip())
+                        ubound += (float(offset) - 1.0)
+                    else: # v.startswith('>'):
                         if v[offset] == '=':
                             offset += 1
-                        lbound = int(v[offset:])
-                        lbound -= (offset - 1)
-                    else:
-                        temp_array = [n.strip() for n in v.split('-')]
-                        if len(temp_array) != 2:
-                            raise Exception("Bad sid range provided in filter; should use format 'nnn-mmm'")
-                        # range is inclusive
-                        lbound = int(temp_array[0]) - 1
-                        ubound = int(temp_array[1]) + 1
-                    #print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
-                    retarray = [s for s in self.metadata_dict.keys() if (s < ubound and s > lbound) and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                        lbound = float(v[offset:].strip())
+                        lbound -= (float(offset) - 1.0)
+                    print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
+                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()] \
+                                  for val in self.metadata_dict[s]["metadata"][k] \
+                                    if (float(val) < float(ubound) and float(val) > float(lbound)) and \
+                                    (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 except Exception as e:
-                    print_error("Unable to parse 'sid' value '%s':\n%s" % (v, e), fatal=True)
+                    print_error("Unable to process '{}' value '{}' (as float):\n{}".format(k, v, e), fatal=True)
         else:
             if k not in self.keys_dict.keys():
-                print_warning("metadata key '%s' not found in ruleset" % k)
+                print_warning("metadata key '{}' not found in ruleset".format(k))
             else:
-                if v not in self.keys_dict[k]:
-                    print_warning("metadata key-value pair '%s' not found in ruleset" % kvpair)
+                # special keyword '<all>' means all values for that key
+                if v == "<all>":
+                    retarray = [s for val in self.keys_dict[k].keys() for s in self.keys_dict[k][val] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                elif v not in self.keys_dict[k]:
+                    print_warning("metadata key-value pair '{}' not found in ruleset".format(kvpair))
                 else:
                     retarray = [s for s in self.keys_dict[k][v] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
         if negate:
             # if key or value not found, this will be all rules
             retarray = list(frozenset(self.get_all_sids()) - frozenset(retarray))
-        return retarray
+        return list(set(retarray))
 
     def evaluate(self, myobj):
         if myobj.isliteral:
-            #TODO: deal with "sid nnnn"
             if isinstance(myobj, boolean.boolean.NOT):
                 return self.get_sids(self.metadata_map[myobj.args[0].obj], negate=True)
             else:
@@ -267,38 +365,41 @@ class Ruleset():
             return retlist
 
     # process boolean string
-    def filter_ruleset(self, filter=None):
-        if not filter:
-            filter = self.filter
+    def filter_ruleset(self, metadata_filter=None):
+        if not metadata_filter:
+            metadata_filter = self.metadata_filter
         # the boolean.py library uses tokenize which isn't designed to
         # handle multi-word tokens (and doesn't support quoting). So
         # just replace and map to single word. This way we can still
         # leverage boolean.py to do simplifying and building of the tree.
-        mytokens = re.findall(r'\x22[a-zA-Z0-9_]+\s[^\x22]+\x22', filter, re.DOTALL)
+        mytokens = re.findall(r'\x22[a-zA-Z0-9_]+[^\x22]+\x22', metadata_filter, re.DOTALL)
         if not mytokens or len(mytokens) == 0:
-            # nothing to filter on ... why go on living?
-            print_error("filter string contains no tokens", fatal=True)
+            # nothing to filter on so exit
+            print_error("metadata_filter string contains no tokens", fatal=True)
         for t in mytokens:
             # key-value pairs are case insensitive; make everything lower case
             tstrip = t.strip('"').lower()
             # also remove extra spaces before, after, and between key and value
             tstrip = ' '.join([e.strip() for e in tstrip.strip().split(' ', 1)])
             print_debug(tstrip)
+            if len(tstrip.split(' ')) == 1:
+                # if just key provided (no value), match on all values
+                tstrip = "{} <all>".format(tstrip)
             # if token begins with digit, the tokenizer doesn't like it
             hashstr = "D" + hashlib.md5(tstrip.encode()).hexdigest()
             # add to mapp dict
             self.metadata_map[hashstr] = tstrip
             # replace in filter str
-            filter = filter.replace(t, hashstr)
+            metadata_filter = metadata_filter.replace(t, hashstr)
 
-        print_debug(filter)
+        print_debug(metadata_filter)
         try:
             algebra = boolean.BooleanAlgebra()
-            mytree = algebra.parse(filter).literalize().simplify()
+            mytree = algebra.parse(metadata_filter).literalize().simplify()
             return self.evaluate(mytree)
 
         except Exception as e:
-            print_error("Problem processing filter string:\n\n%s\n\nError:\n%s" % (filter, e), fatal=True)
+            print_error("Problem processing metadata_filter string:\n\n%s\n\nError:\n%s" % (metadata_filter, e), fatal=True)
 
     def print_header(self):
         """ prints vanity header and global stats """
@@ -337,6 +438,25 @@ class Ruleset():
                 print("\t%s (Total: %d; Enabled: %d; Disabled: %d)" % (ORANGE + value + RESET, total, enabled, disabled))
             print("")
 
+    def print_ruleset_summary(self, sids):
+        """ prints summary/truncated filtered ruleset to stdout
+        """
+        print_debug("print_ruleset_summary() called")
+        summary_max = 10
+        i = 0
+        while i < len(sids):
+            if i < summary_max:
+                matchobj = rule_msg_re.search(self.metadata_dict[sids[i]]['raw_rule'])
+                if not matchobj:
+                    print_warning("Unable to extract rule msg from '{}'.".format(self.metadata_dict[sids[i]]['raw_rule']))
+                    continue
+                msg = matchobj.group("MSG")
+                print msg
+            else:
+                break
+            i += 1
+        print("\n" + BLUE + "Showing {} of {} rules".format(i, len(sids)) + RESET + "\n")
+
 def main():
     global aristotle_logger
 
@@ -345,18 +465,26 @@ def main():
 
     # process command line args
     try:
-        parser = argparse.ArgumentParser()
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument("-r", "--rules", "--ruleset",
                             action="store",
                             dest="rules",
                             required=True,
-                            help="path to rules file")
+                            help="path to rules file or string containing the ruleset")
         parser.add_argument("-f", "--filter",
                             action="store",
-                            dest="filter",
+                            dest="metadata_filter",
                             required=False,
                             default = None,
-                            help="boolean filter string or file containing it")
+                            help="Boolean filter string or path to a file containing it")
+        parser.add_argument("--summary",
+                            action="store_true",
+                            dest="summary_ruleset",
+                            required=False,
+                            default = False,
+                            help="output a summary of the filtered ruleset to stdout; \
+                                  if an output file is given, the full, filtered ruleset \
+                                  will still be written to it.")
         parser.add_argument("-o", "--output",
                             action="store",
                             dest="outfile",
@@ -371,7 +499,7 @@ def main():
                             default=None,
                             help="display ruleset statistics about specified key(s)")
         parser.add_argument("-i", "--include-disabled",
-                            action="store",
+                            action="store_true",
                             dest="include_disabled_rules",
                             required=False,
                             default=False,
@@ -400,8 +528,8 @@ def main():
     else:
         aristotle_logger.setLevel(logging.INFO)
 
-    if args.stats is None and args.filter is None:
-        print_error("'filter' or 'stats' option required. Neither is defined.", fatal=True)
+    if args.stats is None and args.metadata_filter is None:
+        print_error("'metadata_filter' or 'stats' option required. Neither is defined.", fatal=True)
 
     if args.stats is not None:
         keys = []
@@ -423,16 +551,32 @@ def main():
         sys.exit(0)
 
     # create object
-    rs = Ruleset(rules=args.rules, filter=args.filter,
+    rs = Ruleset(rules=args.rules, metadata_filter=args.metadata_filter,
                  outfile=args.outfile,
                  include_disabled_rules=args.include_disabled_rules)
 
+    filtered_sids = rs.filter_ruleset()
 
-    results = rs.filter_ruleset()
+    print_debug("filtered_sids: {}".format(filtered_sids))
 
-    # for now, just print list of matching sids
-    print(results)
-    print("Total: %d" % len(results))
+    # TODO: handle order because of/based on flowbits? Ideally IDS engine should handle...
+    #       see https://redmine.openinfosecfoundation.org/issues/1399
+    if args.outfile == "<stdout>":
+        if args.summary_ruleset:
+            rs.print_ruleset_summary(filtered_sids)
+        else:
+            for s in filtered_sids:
+                print("{}".format(rs.metadata_dict[s]['raw_rule']))
+    else:
+        if args.summary_ruleset:
+            rs.print_ruleset_summary(filtered_sids)
+        try:
+            with open(args.outfile, "w") as fh:
+                for s in filtered_sids:
+                    fh.write("{}\n".format(rs.metadata_dict[s]['raw_rule']))
+        except Exception as e:
+            print_error("Problem writing to file '{}':\n{}".format(args.outfile, e), fatal=True)
+        print(GREEN + "Wrote {} rules to file, '{}'".format(len(filtered_sids), args.outfile) + RESET + "\n")
 
 if __name__== "__main__":
     main()
