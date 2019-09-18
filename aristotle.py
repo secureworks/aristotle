@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Aristotle CLI - command line tool for slicing-and-dicing
+Aristotle CLI - command line tool for filtering
 Suricata and Snort rulesets based on metadata keyword values.
 """
 # Copyright 2019 Secureworks
@@ -16,12 +16,6 @@ Suricata and Snort rulesets based on metadata keyword values.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-#
-# TODO: stats
-#       flowbits?
-#       use objects; make importable/lib
-#       command line option to enable disabled rules when evaluating?
 
 import argparse
 import boolean
@@ -107,6 +101,9 @@ class Ruleset():
                 with open(rules, 'r') as fh:
                     self.rules = fh.read()
             else:
+                if len(rules) < 256 and "metadata" not in rules:
+                    # probably a mis-typed filename
+                    print_error("'{}' is not a valid file and does not appear to be a string containing valid rule(s)".format(rules), fatal=True)
                 self.rules = rules
         except Exception as e:
             print_error("Unable to process rules '%s':\n%s" % (rules, e), fatal=True)
