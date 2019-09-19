@@ -27,6 +27,9 @@ import os
 import re
 import sys
 
+class AristotleException(Exception):
+    pass
+
 # if used as library, attach to "aristotle",
 # e.g. logger = logging.getLogger("aristotle")
 aristotle_logger = logging.getLogger("aristotle")
@@ -76,18 +79,48 @@ else:
     UNDERLINE = ""
 
 def print_error(msg, fatal=True):
+    """
+    Error reporting and logging to "aristotle" logger.
+
+    :param: msg: error message
+    :type: msg: string, required
+    :param: fatal: also log to logging.critical and raise an Exception (or exit if running as a stand-alone script), defaults to `True`.
+    :type: fatal: boolean, optional
+    :raises: `AristotleException`
+    """
     aristotle_logger.error(INVERSE + RED + "ERROR:" + RESET + RED + " %s" % msg + RESET)
     if fatal:
         aristotle_logger.critical(RED + "Cannot continue" + RESET)
-        sys.exit(1)
+        if __name__== "__main__":
+            sys.exit(1)
+        else:
+            raise AristotleException(msg)
 
 def print_debug(msg):
+    """ logging.debug output to "aristotle" logger.
+    """
     aristotle_logger.debug(INVERSE + BLUE + "DEBUG:" + RESET + BLUE + " %s" % msg + RESET)
 
 def print_warning(msg):
+    """ logging.warning output to "aristotle" logger.
+    """
     aristotle_logger.warning(INVERSE + YELLOW + "WARNING:" + RESET + YELLOW + " %s" % msg + RESET)
 
 class Ruleset():
+    """
+    Class for ruleset data structures, filter string, and ruleset operations.
+
+    :param: rules: a string containing a ruleset or a filename of a ruleset file
+    :type: rules: string, required
+    :param: metadata_filter: A string that defines the desired outcome based on
+        Boolean logic, and uses the metadata key-value pairs as values in the
+        Boolean algebra. Defaults to None.
+    :param: metadata_filter: booleansss
+    :type: metadata_filter: string, optional (can be set later)
+    :param: include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
+    :type: include_disabled_rules: boolean
+    :raises: `AristotleException`
+    """
     # dict keys are sids
     metadata_dict = {}
     # dict keys are keys from metadata key-value pairs
@@ -95,7 +128,9 @@ class Ruleset():
     # dict keys are hash of key-value pairs from passed in filter string/file
     metadata_map = {}
 
-    def __init__(self, rules, metadata_filter=None, outfile=None, include_disabled_rules=False):
+    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False):
+        """ Constructor.
+        """
         try:
             if os.path.isfile(rules):
                 with open(rules, 'r') as fh:
@@ -122,12 +157,13 @@ class Ruleset():
             except Exception as e:
                 print_error("Unable to process metadata_filter '%s':\n%s" % (metadata_filter, e), fatal=True)
 
-        self.outfile = outfile
         self.include_disabled_rules = include_disabled_rules
 
         self.parse_rules()
 
     def parse_rules(self):
+        """ Parses the ruleset and builds necessary data structures.
+        """
         lineno = 1
         try:
             for line in self.rules.splitlines():
@@ -203,9 +239,7 @@ class Ruleset():
             print_error("Problem loading rules: %s" % (e), fatal=True)
 
     def cve_compare(self, left_val, right_val, cmp_operator):
-        """ Compare CVE values given comparison operator.
-            May have unexpected results if CVE values (left_val,
-            right_val) not formatted as CVE numbers
+        """ Compare CVE values given comparison operator. May have unexpected results if CVE values (left_val, right_val) not formatted as CVE numbers.  Returns boolean.
         """
         #print_debug("cve_compare() called. left_val: {}, right_val: {}, cmp_operator: {}".format(left_val, right_val, cmp_operator))
         try:
@@ -258,9 +292,22 @@ class Ruleset():
             print_error("Unable to do CVE comparison '{} {} {}':\n{}".format(left_val, cmp_operator, right_val, e), fatal=True)
 
     def get_all_sids(self):
+        """ Returns a list of all enabled SIDs (unless ``self.include_disabled_rules`` is True).
+        """
         return [s for s in self.metadata_dict.keys() if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
 
     def get_sids(self, kvpair, negate=False):
+        """
+        Get a list of all SIDs for passed in key-value pair.
+
+        :param: kvpair: key-value pair
+        :type: kvpair: string, required
+        :param: negate: returns the inverse of the result (i.e. all SIDs not matching the ``kvpair``), defaults to `False`
+        :type: negate: boolean, optional
+        :returns: list of matching SIDs
+        :rtype: list
+        :raises: `AristotleException`
+        """
         k, v = [e.strip() for e in kvpair.split(' ', 1)]
         retarray = []
         # these keys support '>', '<', '>=', and '<='
@@ -353,6 +400,8 @@ class Ruleset():
         return list(set(retarray))
 
     def evaluate(self, myobj):
+        """ Recursive evaluation function that deals
+        """
         if myobj.isliteral:
             if isinstance(myobj, boolean.boolean.NOT):
                 return self.get_sids(self.metadata_map[myobj.args[0].obj], negate=True)
@@ -371,8 +420,18 @@ class Ruleset():
 
         return None
 
-    # process boolean string
     def filter_ruleset(self, metadata_filter=None):
+        """Applies boolean filter against the ruleset and returns list of matching SIDs.
+
+        :param: metadata_filter: A string that defines the desired outcome based on
+            Boolean logic, and uses the metadata key-value pairs as values in the
+            Boolean algebra. Defaults to ``self.metadata_filter``.
+        :type: metadata_filter: string, optional
+        :returns: list of matching SIDs
+        :rtype: list
+        :raises: `AristotleException`
+
+        """
         if not metadata_filter:
             metadata_filter = self.metadata_filter
         if metadata_filter is None:
@@ -406,12 +465,12 @@ class Ruleset():
             algebra = boolean.BooleanAlgebra()
             mytree = algebra.parse(metadata_filter).literalize().simplify()
             return self.evaluate(mytree)
-
         except Exception as e:
-            print_error("Problem processing metadata_filter string:\n\n%s\n\nError:\n%s" % (metadata_filter, e), fatal=True)
+            print_error("Problem processing metadata_filter string:\n\n{}\n\nError:\n{}".format(metadata_filter, e), fatal=True)
 
     def print_header(self):
-        """ prints vanity header and global stats """
+        """ Prints vanity header and global stats.
+        """
         total = len(self.metadata_dict)
         enabled = len([sid for sid in self.metadata_dict.keys() \
                     if not self.metadata_dict[sid]['disabled']])
@@ -425,8 +484,16 @@ class Ruleset():
               RESET + "\n")
 
     def get_stats(self, key, keyonly=False):
-        """ prints stats (total, enabled, disabled) for specified
-            key and values.
+        """
+        Prints stats (total, enabled, disabled) for specified key and values.
+
+        :param: key: key to print stats for
+        :type: key: string, required
+        :param: keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
+        :type: keyonly: boolean, optional
+        :returns: string contaning stats, suitable for printing to stdout
+        :rtype: string
+        :raises: `AristotleException`
         """
         retstr = ""
         if key not in self.keys_dict.keys():
@@ -450,6 +517,8 @@ class Ruleset():
         return retstr
 
     def print_stats(self, key, keyonly=False):
+        """ Print stats to stdout.
+        """
         stats_str = self.get_stats(key=key, keyonly=keyonly)
         if stats_str[-1] == '\n':
             stats_str = stats_str[:-1]
@@ -474,7 +543,35 @@ class Ruleset():
             i += 1
         print("\n" + BLUE + "Showing {} of {} rules".format(i, len(sids)) + RESET + "\n")
 
+    def output_rules(self, sid_list, outfile=None):
+        """
+        Output rules, given a list of SIDs.
+
+        :param sid_list: list of SIDs of the rules to output
+        :type sid_list: list, required
+        :param outfile: filename to output to; if None, output to stdout; defaults to None
+        :type outfile: string or None, optional
+        :returns: None
+        :rtype: NoneType
+        :raises: `AristotleException`
+        """
+        # TODO: handle order because of/based on flowbits? Ideally IDS engine should handle...
+        #       see https://redmine.openinfosecfoundation.org/issues/1399
+        if outfile is None:
+            for s in sid_list:
+                print("{}".format(self.metadata_dict[s]['raw_rule']))
+        else:
+            try:
+                with open(outfile, "w") as fh:
+                    for s in sid_list:
+                        fh.write("{}\n".format(self.metadata_dict[s]['raw_rule']))
+            except Exception as e:
+                print_error("Problem writing to file '{}':\n{}".format(outfile, e), fatal=True)
+            print(GREEN + "Wrote {} rules to file, '{}'".format(len(sid_list), outfile) + RESET + "\n")
+
 def main():
+    """ Main method, called if run as script.
+    """
     global aristotle_logger
 
     # program is run not as library so add logging to console
@@ -569,31 +666,21 @@ def main():
 
     # create object
     rs = Ruleset(rules=args.rules, metadata_filter=args.metadata_filter,
-                 outfile=args.outfile,
                  include_disabled_rules=args.include_disabled_rules)
 
     filtered_sids = rs.filter_ruleset()
 
     print_debug("filtered_sids: {}".format(filtered_sids))
 
-    # TODO: handle order because of/based on flowbits? Ideally IDS engine should handle...
-    #       see https://redmine.openinfosecfoundation.org/issues/1399
     if args.outfile == "<stdout>":
         if args.summary_ruleset:
             rs.print_ruleset_summary(filtered_sids)
         else:
-            for s in filtered_sids:
-                print("{}".format(rs.metadata_dict[s]['raw_rule']))
+            rs.output_rules(sid_list=filtered_sids, outfile=None)
     else:
         if args.summary_ruleset:
             rs.print_ruleset_summary(filtered_sids)
-        try:
-            with open(args.outfile, "w") as fh:
-                for s in filtered_sids:
-                    fh.write("{}\n".format(rs.metadata_dict[s]['raw_rule']))
-        except Exception as e:
-            print_error("Problem writing to file '{}':\n{}".format(args.outfile, e), fatal=True)
-        print(GREEN + "Wrote {} rules to file, '{}'".format(len(filtered_sids), args.outfile) + RESET + "\n")
+        rs.output_rules(sid_list=filtered_sids, outfile=args.outfile)
 
 if __name__== "__main__":
     main()
