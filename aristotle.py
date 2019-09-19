@@ -95,7 +95,7 @@ class Ruleset():
     # dict keys are hash of key-value pairs from passed in filter string/file
     metadata_map = {}
 
-    def __init__(self, rules, metadata_filter="", outfile=None, include_disabled_rules=False):
+    def __init__(self, rules, metadata_filter=None, outfile=None, include_disabled_rules=False):
         try:
             if os.path.isfile(rules):
                 with open(rules, 'r') as fh:
@@ -108,14 +108,19 @@ class Ruleset():
         except Exception as e:
             print_error("Unable to process rules '%s':\n%s" % (rules, e), fatal=True)
 
-        try:
-            if os.path.isfile(metadata_filter):
-                with open(metadata_filter, 'r') as fh:
-                    self.metadata_filter = fh.read()
-            else:
-                self.metadata_filter = metadata_filter
-        except Exception as e:
-            print_error("Unable to process metadata_filter '%s':\n%s" % (metadata_filter, e), fatal=True)
+        if not metadata_filter:
+            self.metadata_filter = None
+            print_debug("No metadata_filter given to Ruleset() constructor")
+        else:
+            try:
+                if os.path.isfile(metadata_filter):
+                    print_debug("Loading metadata_filter file '{}'.".format(metadata_filter))
+                    with open(metadata_filter, 'r') as fh:
+                        self.metadata_filter = fh.read()
+                else:
+                    self.metadata_filter = metadata_filter
+            except Exception as e:
+                print_error("Unable to process metadata_filter '%s':\n%s" % (metadata_filter, e), fatal=True)
 
         self.outfile = outfile
         self.include_disabled_rules = include_disabled_rules
@@ -364,10 +369,14 @@ class Ruleset():
                 retlist = list(frozenset(retlist).intersection(self.evaluate(myobj.args[i])))
             return retlist
 
+        return None
+
     # process boolean string
     def filter_ruleset(self, metadata_filter=None):
         if not metadata_filter:
             metadata_filter = self.metadata_filter
+        if metadata_filter is None:
+            print_error("No metadata_filter set or passed to filter_ruleset()", fatal=True)
         # the boolean.py library uses tokenize which isn't designed to
         # handle multi-word tokens (and doesn't support quoting). So
         # just replace and map to single word. This way we can still
@@ -415,10 +424,11 @@ class Ruleset():
               " Total: %d; Enabled: %d; Disabled: %d" % (total, enabled, disabled) + \
               RESET + "\n")
 
-    def print_stats(self, key, keyonly=False):
+    def get_stats(self, key, keyonly=False):
         """ prints stats (total, enabled, disabled) for specified
             key and values.
         """
+        retstr = ""
         if key not in self.keys_dict.keys():
             print_warning("key '%s' not found" % key)
             return
@@ -428,15 +438,22 @@ class Ruleset():
                      if key in self.metadata_dict[sid]['metadata'].keys() \
                      and not self.metadata_dict[sid]['disabled']])
         disabled = total - enabled
-        print("%s (Total: %d; Enabled: %d; Disabled: %d)" % (REDISH + UNDERLINE + BOLD + key + RESET, total, enabled, disabled))
+        retstr += "{} (Total: {}; Enabled: {}; Disabled: {})\n".format(REDISH + UNDERLINE + BOLD + key + RESET, total, enabled, disabled)
 
         if not keyonly:
             for value in self.keys_dict[key].keys():
                 total = len(self.keys_dict[key][value])
                 enabled = len([sid for sid in self.keys_dict[key][value] if not self.metadata_dict[sid]['disabled']])
                 disabled = total - enabled
-                print("\t%s (Total: %d; Enabled: %d; Disabled: %d)" % (ORANGE + value + RESET, total, enabled, disabled))
-            print("")
+                retstr += "\t{} (Total: {}; Enabled: {}; Disabled: {})\n".format(ORANGE + value + RESET, total, enabled, disabled)
+            retstr += "\n"
+        return retstr
+
+    def print_stats(self, key, keyonly=False):
+        stats_str = self.get_stats(key=key, keyonly=keyonly)
+        if stats_str[-1] == '\n':
+            stats_str = stats_str[:-1]
+        print("{}".format(stats_str))
 
     def print_ruleset_summary(self, sids):
         """ prints summary/truncated filtered ruleset to stdout
@@ -529,7 +546,7 @@ def main():
         aristotle_logger.setLevel(logging.INFO)
 
     if args.stats is None and args.metadata_filter is None:
-        print_error("'metadata_filter' or 'stats' option required. Neither is defined.", fatal=True)
+        print_error("'metadata_filter' or 'stats' option required. Neither provided.", fatal=True)
 
     if args.stats is not None:
         keys = []
