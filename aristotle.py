@@ -82,10 +82,10 @@ def print_error(msg, fatal=True):
     """
     Error reporting and logging to "aristotle" logger.
 
-    :param: msg: error message
-    :type: msg: string, required
-    :param: fatal: also log to logging.critical and raise an Exception (or exit if running as a stand-alone script), defaults to `True`.
-    :type: fatal: boolean, optional
+    :param msg: error message
+    :type msg: string, required
+    :param fatal: also log to logging.critical and raise an Exception (or exit if running as a stand-alone script), defaults to `True`.
+    :type fatal: boolean, optional
     :raises: `AristotleException`
     """
     aristotle_logger.error(INVERSE + RED + "ERROR:" + RESET + RED + " %s" % msg + RESET)
@@ -110,15 +110,15 @@ class Ruleset():
     """
     Class for ruleset data structures, filter string, and ruleset operations.
 
-    :param: rules: a string containing a ruleset or a filename of a ruleset file
-    :type: rules: string, required
-    :param: metadata_filter: A string that defines the desired outcome based on
+    :param rules: a string containing a ruleset or a filename of a ruleset file
+    :type rules: string, required
+    :param metadata_filter: A string that defines the desired outcome based on
         Boolean logic, and uses the metadata key-value pairs as values in the
         Boolean algebra. Defaults to None.
-    :param: metadata_filter: booleansss
-    :type: metadata_filter: string, optional (can be set later)
-    :param: include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
-    :type: include_disabled_rules: boolean
+    :param metadata_filter: booleansss
+    :type metadata_filter: string, optional (can be set later)
+    :param include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
+    :type include_disabled_rules: boolean
     :raises: `AristotleException`
     """
     # dict keys are sids
@@ -300,10 +300,10 @@ class Ruleset():
         """
         Get a list of all SIDs for passed in key-value pair.
 
-        :param: kvpair: key-value pair
-        :type: kvpair: string, required
-        :param: negate: returns the inverse of the result (i.e. all SIDs not matching the ``kvpair``), defaults to `False`
-        :type: negate: boolean, optional
+        :param kvpair: key-value pair
+        :type kvpair: string, required
+        :param negate: returns the inverse of the result (i.e. all SIDs not matching the ``kvpair``), defaults to `False`
+        :type negate: boolean, optional
         :returns: list of matching SIDs
         :rtype: list
         :raises: `AristotleException`
@@ -423,14 +423,13 @@ class Ruleset():
     def filter_ruleset(self, metadata_filter=None):
         """Applies boolean filter against the ruleset and returns list of matching SIDs.
 
-        :param: metadata_filter: A string that defines the desired outcome based on
+        :param metadata_filter: A string that defines the desired outcome based on
             Boolean logic, and uses the metadata key-value pairs as values in the
             Boolean algebra. Defaults to ``self.metadata_filter``.
-        :type: metadata_filter: string, optional
+        :type metadata_filter: string, optional
         :returns: list of matching SIDs
         :rtype: list
         :raises: `AristotleException`
-
         """
         if not metadata_filter:
             metadata_filter = self.metadata_filter
@@ -487,10 +486,10 @@ class Ruleset():
         """
         Prints stats (total, enabled, disabled) for specified key and values.
 
-        :param: key: key to print stats for
-        :type: key: string, required
-        :param: keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
-        :type: keyonly: boolean, optional
+        :param key: key to print stats for
+        :type key: string, required
+        :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
+        :type keyonly: boolean, optional
         :returns: string contaning stats, suitable for printing to stdout
         :rtype: string
         :raises: `AristotleException`
