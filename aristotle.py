@@ -88,7 +88,7 @@ def print_error(msg, fatal=True):
     :type fatal: boolean, optional
     :raises: `AristotleException`
     """
-    aristotle_logger.error(INVERSE + RED + "ERROR:" + RESET + RED + " %s" % msg + RESET)
+    aristotle_logger.error(INVERSE + RED + "ERROR:" + RESET + RED + " {}".format(msg) + RESET)
     if fatal:
         aristotle_logger.critical(RED + "Cannot continue" + RESET)
         if __name__== "__main__":
@@ -99,12 +99,12 @@ def print_error(msg, fatal=True):
 def print_debug(msg):
     """ logging.debug output to "aristotle" logger.
     """
-    aristotle_logger.debug(INVERSE + BLUE + "DEBUG:" + RESET + BLUE + " %s" % msg + RESET)
+    aristotle_logger.debug(INVERSE + BLUE + "DEBUG:" + RESET + BLUE + " {}".format(msg) + RESET)
 
 def print_warning(msg):
     """ logging.warning output to "aristotle" logger.
     """
-    aristotle_logger.warning(INVERSE + YELLOW + "WARNING:" + RESET + YELLOW + " %s" % msg + RESET)
+    aristotle_logger.warning(INVERSE + YELLOW + "WARNING:" + RESET + YELLOW + " {}".format(msg) + RESET)
 
 class Ruleset():
     """
@@ -140,7 +140,7 @@ class Ruleset():
                     print_error("'{}' is not a valid file and does not appear to be a string containing valid rule(s)".format(rules), fatal=True)
                 self.rules = rules
         except Exception as e:
-            print_error("Unable to process rules '%s':\n%s" % (rules, e), fatal=True)
+            print_error("Unable to process rules '{}':\n{}".format(rules, e), fatal=True)
 
         if not metadata_filter:
             self.metadata_filter = None
@@ -154,7 +154,7 @@ class Ruleset():
                 else:
                     self.metadata_filter = metadata_filter
             except Exception as e:
-                print_error("Unable to process metadata_filter '%s':\n%s" % (metadata_filter, e), fatal=True)
+                print_error("Unable to process metadata_filter '{}':\n{}".format(metadata_filter, e), fatal=True)
 
         self.include_disabled_rules = include_disabled_rules
 
@@ -176,14 +176,14 @@ class Ruleset():
                         is_disabled_rule = True
                     else:
                         # valid comment (not disabled rule)
-                        print_debug("Skipping comment: %s" % line)
+                        print_debug("Skipping comment: {}".format(line))
                         lineno += 1
                         continue
 
                 # extract sid
                 matchobj = sid_re.search(line)
                 if not matchobj:
-                    print_error("Invalid rule on line %d:\n%s" % (lineno, line), fatal=True)
+                    print_error("Invalid rule on line {}:\n{}".format(lineno, line), fatal=True)
                 sid = int(matchobj.group("SID"))
 
                 # extract metadata keyword value
@@ -192,7 +192,7 @@ class Ruleset():
                 if matchobj:
                     metadata_str = matchobj.group("METADATA")
                 if (lineno % 1000 == 0):
-                    print_debug("metadata_str for sid %d:\n%s" % (sid, metadata_str))
+                    print_debug("metadata_str for sid {}:\n{}".format(sid, metadata_str))
 
                 # build dict
                 self.metadata_dict[sid] = {'metadata': {},
@@ -231,11 +231,11 @@ class Ruleset():
                     self.metadata_dict[sid]['metadata']['sid'] = [sid]
                     self.keys_dict['sid'][sid] = [sid]
                 lineno += 1
-            print_debug("metadata_dict:\n%s" % self.metadata_dict)
-            print_debug("keys_dict:\n%s" % self.keys_dict)
+            print_debug("metadata_dict:\n{}".format(self.metadata_dict))
+            print_debug("keys_dict:\n{}".format(self.keys_dict))
 
         except Exception as e:
-            print_error("Problem loading rules: %s" % (e), fatal=True)
+            print_error("Problem loading rules: {}".format(e), fatal=True)
 
     def cve_compare(self, left_val, right_val, cmp_operator):
         """ Compare CVE values given comparison operator. May have unexpected results if CVE values (left_val, right_val) not formatted as CVE numbers.  Returns boolean.
@@ -478,7 +478,7 @@ class Ruleset():
               "\n Ruleset Metadata Tool " + RESET + "\n")
         print(UNDERLINE + BOLD + GREEN + "All Rules:" + \
               RESET + GREEN + \
-              " Total: %d; Enabled: %d; Disabled: %d" % (total, enabled, disabled) + \
+              " Total: {}; Enabled: {}; Disabled: {}".format(total, enabled, disabled) + \
               RESET + "\n")
 
     def get_stats(self, key, keyonly=False):
@@ -495,7 +495,7 @@ class Ruleset():
         """
         retstr = ""
         if key not in self.keys_dict.keys():
-            print_warning("key '%s' not found" % key)
+            print_warning("key '{}' not found".format(key))
             return
         total = len([sid for sid in self.metadata_dict.keys() \
                      if key in self.metadata_dict[sid]['metadata'].keys()])
@@ -631,7 +631,7 @@ def main():
                             help="turn on debug output")
         args = parser.parse_args()
     except Exception as e:
-        print_error("Problem parsing command line args: %s" % (e), fatal=True)
+        print_error("Problem parsing command line args: {}".format(e), fatal=True)
 
 
     if args.debug:
