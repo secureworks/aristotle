@@ -77,8 +77,8 @@ filter strings.
 
 Also in the ``examples`` directory is an ``example.rules`` file that has a dummy
 ruleset that implements the `BETTER
-Schema <https://github.com/secureworks/BETTER/>`__. This is not a real
-ruleset. It is provided to assist in demonstrating the functionality of
+Schema <https://github.com/secureworks/BETTER/>`__. *This is not a real
+ruleset*. It is provided to assist in demonstrating the functionality of
 Aristotle.
 
 Example Usage
