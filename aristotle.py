@@ -214,7 +214,7 @@ class Ruleset():
                         continue
                     k, v = kvsplit
                     if k == "sid" and int(v) != sid:
-                        # this is in violation of the schema, should we error and die?
+                        # this is in violation of the BETTER schema, should we error and die?
                         print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'. This may lead to unexpected results".format(lineno, v, sid))
                     # populate metadata_dict
                     if k not in self.metadata_dict[sid]['metadata'].keys():
@@ -231,8 +231,8 @@ class Ruleset():
                     self.metadata_dict[sid]['metadata']['sid'] = [sid]
                     self.keys_dict['sid'][sid] = [sid]
                 lineno += 1
-            print_debug("metadata_dict:\n{}".format(self.metadata_dict))
-            print_debug("keys_dict:\n{}".format(self.keys_dict))
+            #print_debug("metadata_dict:\n{}".format(self.metadata_dict))
+            #print_debug("keys_dict:\n{}".format(self.keys_dict))
 
         except Exception as e:
             print_error("Problem loading rules: {}".format(e), fatal=True)
@@ -391,6 +391,8 @@ class Ruleset():
                     retarray = [s for val in self.keys_dict[k].keys() for s in self.keys_dict[k][val] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 elif v not in self.keys_dict[k]:
                     print_warning("metadata key-value pair '{}' not found in ruleset".format(kvpair))
+                    # retarray should stil be empty but in case not:
+                    retarray = []
                 else:
                     retarray = [s for s in self.keys_dict[k][v] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
         if negate:
@@ -416,7 +418,7 @@ class Ruleset():
             for i in range(1, len(myobj.args)):
                 retlist = list(frozenset(retlist).intersection(self.evaluate(myobj.args[i])))
             return retlist
-
+        # not reached
         return None
 
     def filter_ruleset(self, metadata_filter=None):
@@ -483,7 +485,7 @@ class Ruleset():
 
     def get_stats(self, key, keyonly=False):
         """
-        Prints stats (total, enabled, disabled) for specified key and values.
+        Returns string of stats (total, enabled, disabled) for specified key and values.
 
         :param key: key to print stats for
         :type key: string, required
@@ -603,7 +605,7 @@ def main():
                             dest="outfile",
                             required=False,
                             default="<stdout>",
-                            help="output file")
+                            help="output file to write filtered ruleset to")
         parser.add_argument("-s", "--stats",
                             nargs='*',
                             action="store",
@@ -616,19 +618,19 @@ def main():
                             dest="include_disabled_rules",
                             required=False,
                             default=False,
-                            help="include disabled rules when applying the filter")
+                            help="include (effectively enable) disabled rules when applying the filter")
         parser.add_argument("-q", "--quiet", "--suppress_warnings",
                             action="store_true",
                             dest="suppress_warnings",
                             default=False,
                             required=False,
-                            help="quiet; suppress warning messages")
+                            help="quiet; suppress warning logging")
         parser.add_argument("-d", "--debug",
                             action="store_true",
                             dest="debug",
                             default=False,
                             required=False,
-                            help="turn on debug output")
+                            help="turn on debug logging")
         args = parser.parse_args()
     except Exception as e:
         print_error("Problem parsing command line args: {}".format(e), fatal=True)

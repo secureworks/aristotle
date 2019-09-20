@@ -44,7 +44,7 @@ Usage
 .. code:: text
 
   usage: aristotle.py [-h] -r RULES [-f METADATA_FILTER] [--summary]
-                    [-o OUTFILE] [-s [STATS [STATS ...]]] [-i] [-q] [-d]
+                      [-o OUTFILE] [-s [STATS [STATS ...]]] [-i] [-q] [-d]
 
   optional arguments:
     -h, --help            show this help message and exit
@@ -58,16 +58,17 @@ Usage
                           an output file is given, the full, filtered ruleset
                           will still be written to it. (default: False)
     -o OUTFILE, --output OUTFILE
-                          output file (default: <stdout>)
+                          output file to write filtered ruleset to (default:
+                          <stdout>)
     -s [STATS [STATS ...]], --stats [STATS [STATS ...]]
                           display ruleset statistics about specified key(s)
                           (default: None)
     -i, --include-disabled
-                          include disabled rules when applying the filter
-                          (default: False)
+                          include (effectively enable) disabled rules when
+                          applying the filter (default: False)
     -q, --quiet, --suppress_warnings
-                         quiet; suppress warning messages (default: False)
-    -d, --debug           turn on debug output (default: False)
+                          quiet; suppress warning logging (default: False)
+    -d, --debug           turn on debug logging (default: False)
 
 Example Files
 -------------
