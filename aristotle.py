@@ -114,9 +114,8 @@ class Ruleset():
     :type rules: string, required
     :param metadata_filter: A string that defines the desired outcome based on
         Boolean logic, and uses the metadata key-value pairs as values in the
-        Boolean algebra. Defaults to None.
-    :param metadata_filter: booleansss
-    :type metadata_filter: string, optional (can be set later)
+        Boolean algebra. Defaults to None (can be provided later).
+    :type metadata_filter: string, optional
     :param include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
     :type include_disabled_rules: boolean
     :raises: `AristotleException`
