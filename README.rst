@@ -27,7 +27,7 @@ the metadata keyword, ruleset providers can embed rich teleological and
 taxonomic information. This information can be used to filter a ruleset
 – essentially enabling and disabling rules in a ruleset based on the
 metadata key-value pairs. Aristotle allows for the easy leveraging of
-the metadata key-value pairs to “slice-and-dice” Suricata and Snort
+the metadata key-value pairs to "slice-and-dice" Suricata and Snort
 rulesets that implement metadata key-value pairs.
 
 Metadata Key-Value Pairs
@@ -104,7 +104,7 @@ filter string.
 If no key names are passed, summary info on all present keys is
 displayed:
 
-.. code:: bash
+.. code:: text
 
   $ python aristotle.py -r examples/example.rules -s
 
@@ -135,7 +135,7 @@ displayed:
 If one of more key names are passed, summary info is displayed for those
 keys:
 
-.. code:: bash
+.. code:: text
 
   $ python aristotle.py -r examples/example.rules -s malware protocols
 
@@ -178,12 +178,14 @@ Boolean Filter Strings
 ======================
 
 A filter string defines the desired outcome based on Boolean logic, and
-uses the metadata key-value pairs as values in the Boolean algebra:
+uses the metadata key-value pairs as values in a (concrete)
+`Boolean algebra <https://en.wikipedia.org/wiki/Boolean_algebra>`__:
 
 -  The Boolean operators AND, OR, and NOT are allowed.
--  The key-value pair specifications *must* be surrounded by double
-   quotes.
--  To match all values of a key, use the pseudo-value "<ALL>” (not case
+-  Grouping should be done with parentheses.
+-  **The key-value pair specifications must be surrounded by double
+   quotes (ASCII 0x22).**
+-  To match all values of a key, use the pseudo-value "<ALL>" (not case
    sensitive), e.g. ``"malware <ALL>"``.
 -  Extraneous whitespace, including newlines, is allowed in the filter
    string.
@@ -198,18 +200,18 @@ Match all high priority malware related rules:
 Match all high priority malware related rules that were created in 2018
 or later:
 
-``("priority high" AND "malware <ALL>") AND "created\_at > 2018-01-01"``
+``("priority high" AND "malware <ALL>") AND "created_at > 2018-01-01"``
 
 Match all high and medium rules that are designed to protect a
 webserver:
 
-``("priority high" OR "priority medium") AND ("attack\_target http-server"
-OR "attack\_target tls-server")``
+``("priority high" OR "priority medium") AND ("attack_target http-server"
+OR "attack_target tls-server")``
 
 Match all high priority rules that were created in 2019 or involve a
 vulnerability (based on CVE number) from 2018 or later:
 
-``"priority high" AND (("created\_at >= 2019-01-01" AND "created\_at <=
+``"priority high" AND (("created_at >= 2019-01-01" AND "created_at <=
 2019-12-31") OR "cve >= 2018-0000")``
 
 Aristotle as a Library
@@ -219,7 +221,8 @@ Aristotle can be imported and used like a normal library:
 
 ``import aristotle``
 
-For logging and/or output, attach to the logger named “aristotle”:
+For logging and/or output, attach to the logger named "aristotle" and
+add desired Handler(s), e.g.:
 
 .. code:: python
 
@@ -258,13 +261,16 @@ Statistics on the ruleset can be returned (if desired):
 | Raises:        | *AristotleException*                                                                                                                          |
 +----------------+-----------------------------------------------------------------------------------------------------------------------------------------------+
 
-If no value to the ``metadata_filter`` parameter is passed, then at some
+If no value to the ``metadata_filter`` parameter is passed to the
+constructor, then at some
 point before filtering happens, a filter must be provided, either
-directly to the object or in the call to ``filter_ruleset()``:
+in the call to ``filter_ruleset()`` or the ``Ruleset`` object parameter
+set, e.g.:
 
-```myruleset.metatdata_filter = ‘<filter here>’```
+``myruleset.metatdata_filter = '<filter here>'``
 
-To filter the ruleset against, call filter\_ruleset(); if a filter has
+To filter the ruleset using the ``metadata_filter``, call
+filter\_ruleset(); if a filter has
 not been defined, it can be passed when calling this function.
 
 \ *filter\_ruleset*\ (**self**, **metadata\_filter=None**)
@@ -279,7 +285,7 @@ not been defined, it can be passed when calling this function.
 | Raises:        | *AristotleException*                                                                                                                                                                                                         |
 +----------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
-Output the ruleset:
+To output the ruleset, call ``output_rules()``:
 
 \ *output\_rules*\ (*self*, *sid\_list*, *outfile=None*)
 
@@ -295,13 +301,13 @@ Output the ruleset:
 | Raises:        | *AristotleException*                                                                                            |
 +----------------+-----------------------------------------------------------------------------------------------------------------+
 
-See the code for more details on these and other functions.
+See the code/docstrings for more details on these and other functions.
 
 License
 =======
 
 Aristotle is licensed under the Apache License, Version 2.0. See
-LICENSE.
+`LICENSE <LICENSE>`__.
 
 Authors
 =======
