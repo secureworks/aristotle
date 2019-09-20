@@ -8,8 +8,7 @@ in the metadata keyword within each rule. It can be run as a standalone
 script or utilized as a library.
 
 .. contents::
-   :depth: 2
-..
+   :depth: 3
 
 Application Overview
 ====================
@@ -42,7 +41,7 @@ pairs. Aristotle assumes that the provided ruleset conforms to the
 Usage
 =====
 
-.. code:: bash
+.. code:: text
 
   usage: aristotle.py [-h] -r RULES [-f METADATA_FILTER] [--summary]
                     [-o OUTFILE] [-s [STATS [STATS ...]]] [-i] [-q] [-d]
