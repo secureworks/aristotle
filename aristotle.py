@@ -526,7 +526,8 @@ class Ruleset():
         """ prints summary/truncated filtered ruleset to stdout
         """
         print_debug("print_ruleset_summary() called")
-        summary_max = 10
+        print("")
+        summary_max = 16
         i = 0
         while i < len(sids):
             if i < summary_max:
@@ -535,7 +536,7 @@ class Ruleset():
                     print_warning("Unable to extract rule msg from '{}'.".format(self.metadata_dict[sids[i]]['raw_rule']))
                     continue
                 msg = matchobj.group("MSG")
-                print msg
+                print("{} [sid:{}]".format(msg, sids[i]))
             else:
                 break
             i += 1
