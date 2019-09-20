@@ -114,9 +114,8 @@ class Ruleset():
     :type rules: string, required
     :param metadata_filter: A string that defines the desired outcome based on
         Boolean logic, and uses the metadata key-value pairs as values in the
-        Boolean algebra. Defaults to None.
-    :param metadata_filter: booleansss
-    :type metadata_filter: string, optional (can be set later)
+        Boolean algebra. Defaults to None (can be provided later).
+    :type metadata_filter: string, optional
     :param include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
     :type include_disabled_rules: boolean
     :raises: `AristotleException`
@@ -319,7 +318,7 @@ class Ruleset():
                      'cvss_v3_temporal',
                      'created_at',
                      'updated_at']
-        if k in rangekeys and (v.startswith('<') or v.startswith('>')) and v != "<all>":
+        if k in rangekeys and (v.startswith('<') or v.startswith('>')) and v not in ["<all>", "<any>"]:
             if len(v) < 2:
                 print_error("Invalid value '{}' for key '{}'.".format(v, k), fatal=True)
             if k == "cve":
@@ -388,7 +387,7 @@ class Ruleset():
                 print_warning("metadata key '{}' not found in ruleset".format(k))
             else:
                 # special keyword '<all>' means all values for that key
-                if v == "<all>":
+                if v in ["<all>", "<any>"]:
                     retarray = [s for val in self.keys_dict[k].keys() for s in self.keys_dict[k][val] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 elif v not in self.keys_dict[k]:
                     print_warning("metadata key-value pair '{}' not found in ruleset".format(kvpair))
