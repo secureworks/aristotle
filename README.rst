@@ -71,7 +71,7 @@ Usage
     -d, --debug           turn on debug output (default: False)
 
 Example Files
-=============
+-------------
 
 The examples directory has .filter files that show examples of Boolean
 filter strings.
@@ -83,7 +83,7 @@ ruleset. It is provided to assist in demonstrating the functionality of
 Aristotle.
 
 Example Usage
-=============
+-------------
 
 ``python aristotle.py -r examples/example.rules -s``
 
@@ -91,8 +91,12 @@ Example Usage
 
 ``python aristotle.py -r examples/example.rules -f examples/example1.filter --summary``
 
+``python aristotle.py -r examples/example.rules -f examples/example1.filter -o newrules.rules``
+
+``python aristotle.py -r examples/example.rules -f '"malware <ALL>" AND ("attack_target http-server" or "attack_target tls-server")' -o newrules.rules``
+
 Statistics
-==========
+----------
 
 The statistics command line option allows a user to to easily see what
 metadata key-value pairs the ruleset contains to assist in building a
@@ -186,6 +190,7 @@ uses the metadata key-value pairs as values in the Boolean algebra:
    string.
 
 Example Filter Strings
+----------------------
 
 Match all high priority malware related rules:
 
