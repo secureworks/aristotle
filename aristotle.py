@@ -399,7 +399,7 @@ class Ruleset():
         return list(set(retarray))
 
     def evaluate(self, myobj):
-        """ Recursive evaluation function that deals
+        """ Recursive evaluation function that deals with BooleanAlgebra elements from boolean.py.
         """
         if myobj.isliteral:
             if isinstance(myobj, boolean.boolean.NOT):
