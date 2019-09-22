@@ -228,8 +228,10 @@ class Ruleset():
                     self.keys_dict[k][v].append(sid)
                 # add sid as pseudo metadata key unless it already exist
                 if 'sid' not in self.metadata_dict[sid]['metadata'].keys():
-                    self.metadata_dict[sid]['metadata']['sid'] = [sid]
-                    self.keys_dict['sid'][sid] = [sid]
+                    # keys and values are strings; variable "sid" is int so must
+                    # be cast as str when used the same way other keys and values are used.
+                    self.metadata_dict[sid]['metadata']['sid'] = [str(sid)]
+                    self.keys_dict['sid'][str(sid)] = [sid]
                 lineno += 1
             #print_debug("metadata_dict:\n{}".format(self.metadata_dict))
             #print_debug("keys_dict:\n{}".format(self.keys_dict))
@@ -580,7 +582,20 @@ def main():
 
     # process command line args
     try:
-        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description="Filter Suricata and Snort rulesets based on metadata keyword values.",
+            epilog="""A filter string defines the desired outcome based on Boolean logic, and uses
+the metadata key-value pairs as values in a (concrete) Boolean algebra.
+The key-value pair specifications must be surrounded by double quotes.
+Example:
+
+$ python aristotle.py -r examples/example.rules --summary -f '(("priority high"
+AND "malware <ALL>") AND "created_at > 2018-01-01") AND NOT ("protocols smtp"
+AND "protocols pop" AND "protocols imap") OR "sid 80181444"'
+
+"""
+            )
         parser.add_argument("-r", "--rules", "--ruleset",
                             action="store",
                             dest="rules",
