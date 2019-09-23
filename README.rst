@@ -262,14 +262,16 @@ To use, create a Ruleset object and pass it a string containing the
 ruleset or a filename of a ruleset:
 
 \ *class Ruleset*\ (*self*, *rules*, *metadata\_filter=None*,
-*include\_disabled\_rules=False*)
+*include\_disabled\_rules=False*, *summary\_max=16*)
 
 +---------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Parameters:   | **rules** (*string, required*) – a string containing a ruleset or a filename of a ruleset file                                                                                                                                    |
 |               |                                                                                                                                                                                                                                   |
-|               | **metadata\_filter** (*string, optional*) – A string that defines the desired outcome based on Boolean logic, and uses the metadata key-value pairs as values in the Boolean algebra. Defaults to None (can be provided later).   |
+|               | **metadata\_filter** (*string, optional*) – A string that defines the desired outcome based on Boolean logic, and uses the metadata key-value pairs as values in the Boolean algebra. Defaults to `None` (can be provided later). |
 |               |                                                                                                                                                                                                                                   |
 |               | **include\_disabled\_rules** (*boolean*) – effectively enable all commented out rules when dealing with the ruleset, defaults to *False*                                                                                          |
+|               |                                                                                                                                                                                                                                   |
+|               | **summary\_max** (*int*) – the maximum number of rules to print when outputting summary/truncated filtered ruleset, defaults to *16*.                                                                                             |
 +---------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Raises:       | *AristotleException*                                                                                                                                                                                                              |
 +---------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
