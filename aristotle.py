@@ -578,7 +578,7 @@ the metadata key-value pairs as values in a (concrete) Boolean algebra.
 The key-value pair specifications must be surrounded by double quotes.
 Example:
 
-$ python aristotle.py -r examples/example.rules --summary -f '(("priority high"
+python3 aristotle.py -r examples/example.rules --summary -f '(("priority high"
 AND "malware <ALL>") AND "created_at > 2018-01-01") AND NOT ("protocols smtp"
 AND "protocols pop" AND "protocols imap") OR "sid 80181444"'
 
