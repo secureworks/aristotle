@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""
-Aristotle CLI - command line tool for filtering
-Suricata and Snort rulesets based on metadata keyword values.
+"""Aristotle CLI
+
+Command line tool for filtering Suricata and Snort rulesets based on metadata keyword values.
 """
 # Copyright 2019 Secureworks
 #
@@ -79,8 +79,7 @@ else:
     UNDERLINE = ""
 
 def print_error(msg, fatal=True):
-    """
-    Error reporting and logging to "aristotle" logger.
+    """Error reporting and logging to "aristotle" logger.
 
     :param msg: error message
     :type msg: string, required
@@ -97,18 +96,15 @@ def print_error(msg, fatal=True):
             raise AristotleException(msg)
 
 def print_debug(msg):
-    """ logging.debug output to "aristotle" logger.
-    """
+    """logging.debug output to "aristotle" logger."""
     aristotle_logger.debug(INVERSE + BLUE + "DEBUG:" + RESET + BLUE + " {}".format(msg) + RESET)
 
 def print_warning(msg):
-    """ logging.warning output to "aristotle" logger.
-    """
+    """logging.warning output to "aristotle" logger."""
     aristotle_logger.warning(INVERSE + YELLOW + "WARNING:" + RESET + YELLOW + " {}".format(msg) + RESET)
 
 class Ruleset():
-    """
-    Class for ruleset data structures, filter string, and ruleset operations.
+    """Class for ruleset data structures, filter string, and ruleset operations.
 
     :param rules: a string containing a ruleset or a filename of a ruleset file
     :type rules: string, required
@@ -118,6 +114,8 @@ class Ruleset():
     :type metadata_filter: string, optional
     :param include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
     :type include_disabled_rules: boolean
+    :param summary_max: the maximum number of rules to print when outputting summary/truncated filtered ruleset, defaults to `16`.
+    :type summary_max: int, optional
     :raises: `AristotleException`
     """
     # dict keys are sids
@@ -127,9 +125,8 @@ class Ruleset():
     # dict keys are hash of key-value pairs from passed in filter string/file
     metadata_map = {}
 
-    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False):
-        """ Constructor.
-        """
+    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False, summary_max=16):
+        """Constructor."""
         try:
             if os.path.isfile(rules):
                 with open(rules, 'r') as fh:
@@ -157,19 +154,19 @@ class Ruleset():
                 print_error("Unable to process metadata_filter '{}':\n{}".format(metadata_filter, e), fatal=True)
 
         self.include_disabled_rules = include_disabled_rules
-
+        try:
+            self.summary_max = int(summary_max)
+        except Exception as e:
+            print_error("Unable to process 'summary_max' value '{}' passed to Ruleset constructor:\n{}".format(summary_max, e))
         self.parse_rules()
 
     def parse_rules(self):
-        """ Parses the ruleset and builds necessary data structures.
-        """
-        lineno = 1
+        """Parses the ruleset and builds necessary data structures."""
         try:
-            for line in self.rules.splitlines():
+            for lineno, line in enumerate(self.rules.splitlines()):
              # ignore comments and blank lines
                 is_disabled_rule = False
                 if len(line.strip()) == 0:
-                    lineno += 1
                     continue
                 if line.lstrip().startswith('#'):
                     if disabled_rule_re.match(line):
@@ -177,7 +174,6 @@ class Ruleset():
                     else:
                         # valid comment (not disabled rule)
                         print_debug("Skipping comment: {}".format(line))
-                        lineno += 1
                         continue
 
                 # extract sid
@@ -232,7 +228,6 @@ class Ruleset():
                     # be cast as str when used the same way other keys and values are used.
                     self.metadata_dict[sid]['metadata']['sid'] = [str(sid)]
                     self.keys_dict['sid'][str(sid)] = [sid]
-                lineno += 1
             #print_debug("metadata_dict:\n{}".format(self.metadata_dict))
             #print_debug("keys_dict:\n{}".format(self.keys_dict))
 
@@ -240,7 +235,10 @@ class Ruleset():
             print_error("Problem loading rules: {}".format(e), fatal=True)
 
     def cve_compare(self, left_val, right_val, cmp_operator):
-        """ Compare CVE values given comparison operator. May have unexpected results if CVE values (left_val, right_val) not formatted as CVE numbers.  Returns boolean.
+        """Compare CVE values given comparison operator.
+
+        May have unexpected results if CVE values (left_val, right_val) not formatted as CVE numbers.
+        Returns boolean.
         """
         #print_debug("cve_compare() called. left_val: {}, right_val: {}, cmp_operator: {}".format(left_val, right_val, cmp_operator))
         try:
@@ -293,13 +291,11 @@ class Ruleset():
             print_error("Unable to do CVE comparison '{} {} {}':\n{}".format(left_val, cmp_operator, right_val, e), fatal=True)
 
     def get_all_sids(self):
-        """ Returns a list of all enabled SIDs (unless ``self.include_disabled_rules`` is True).
-        """
+        """Returns a list of all enabled SIDs (unless ``self.include_disabled_rules`` is True)."""
         return [s for s in self.metadata_dict.keys() if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
 
     def get_sids(self, kvpair, negate=False):
-        """
-        Get a list of all SIDs for passed in key-value pair.
+        """Get a list of all SIDs for passed in key-value pair.
 
         :param kvpair: key-value pair
         :type kvpair: string, required
@@ -403,8 +399,7 @@ class Ruleset():
         return list(set(retarray))
 
     def evaluate(self, myobj):
-        """ Recursive evaluation function that deals with BooleanAlgebra elements from boolean.py.
-        """
+        """Recursive evaluation function that deals with BooleanAlgebra elements from boolean.py."""
         if myobj.isliteral:
             if isinstance(myobj, boolean.boolean.NOT):
                 return self.get_sids(self.metadata_map[myobj.args[0].obj], negate=True)
@@ -471,8 +466,7 @@ class Ruleset():
             print_error("Problem processing metadata_filter string:\n\n{}\n\nError:\n{}".format(metadata_filter, e), fatal=True)
 
     def print_header(self):
-        """ Prints vanity header and global stats.
-        """
+        """Prints vanity header and global stats."""
         total = len(self.metadata_dict)
         enabled = len([sid for sid in self.metadata_dict.keys() \
                     if not self.metadata_dict[sid]['disabled']])
@@ -486,8 +480,7 @@ class Ruleset():
               RESET + "\n")
 
     def get_stats(self, key, keyonly=False):
-        """
-        Returns string of stats (total, enabled, disabled) for specified key and values.
+        """Returns string of stats (total, enabled, disabled) for specified key and values.
 
         :param key: key to print stats for
         :type key: string, required
@@ -519,22 +512,19 @@ class Ruleset():
         return retstr
 
     def print_stats(self, key, keyonly=False):
-        """ Print stats to stdout.
-        """
+        """Print stats to stdout."""
         stats_str = self.get_stats(key=key, keyonly=keyonly)
         if stats_str[-1] == '\n':
             stats_str = stats_str[:-1]
         print("{}".format(stats_str))
 
     def print_ruleset_summary(self, sids):
-        """ prints summary/truncated filtered ruleset to stdout
-        """
+        """Prints summary/truncated filtered ruleset to stdout."""
         print_debug("print_ruleset_summary() called")
         print("")
-        summary_max = 16
         i = 0
         while i < len(sids):
-            if i < summary_max:
+            if i < self.summary_max:
                 matchobj = rule_msg_re.search(self.metadata_dict[sids[i]]['raw_rule'])
                 if not matchobj:
                     print_warning("Unable to extract rule msg from '{}'.".format(self.metadata_dict[sids[i]]['raw_rule']))
@@ -547,12 +537,11 @@ class Ruleset():
         print("\n" + BLUE + "Showing {} of {} rules".format(i, len(sids)) + RESET + "\n")
 
     def output_rules(self, sid_list, outfile=None):
-        """
-        Output rules, given a list of SIDs.
+        """Output rules, given a list of SIDs.
 
         :param sid_list: list of SIDs of the rules to output
         :type sid_list: list, required
-        :param outfile: filename to output to; if None, output to stdout; defaults to None
+        :param outfile: filename to output to; if None, output to stdout; defaults to `None`
         :type outfile: string or None, optional
         :returns: None
         :rtype: NoneType
@@ -573,8 +562,7 @@ class Ruleset():
             print(GREEN + "Wrote {} rules to file, '{}'".format(len(sid_list), outfile) + RESET + "\n")
 
 def main():
-    """ Main method, called if run as script.
-    """
+    """Main method, called if run as script."""
     global aristotle_logger
 
     # program is run not as library so add logging to console
