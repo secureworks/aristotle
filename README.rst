@@ -40,6 +40,17 @@ has rules with the metadata keyword populated with appropriate key-value
 pairs. Aristotle assumes that the provided ruleset conforms to the
 `BETTER Schema <https://github.com/secureworks/BETTER/>`__.
 
+Setup
+=====
+
+Install dependencies:
+
+``pip install -r requirements.txt``
+
+Or if using as a library:
+
+*coming soon* ``pip install ....``
+
 Usage
 =====
 
