@@ -17,6 +17,9 @@ Aristotle takes in a ruleset and can provide statistics on the included
 metadata keys. If a filter string is provided, it will also be applied
 against the ruleset and the filtered ruleset outputted.
 
+Note: Aristotle does *not* modify the contents of rules. It simply
+includes or excludes rules based on the given Boolean filter string.
+
 Aristotle is compatible with Python 2.7 and Python 3.x.
 
 Background
