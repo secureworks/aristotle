@@ -221,8 +221,10 @@ uses the metadata key-value pairs as values in a (concrete)
    string.
 
 The following keys support the ``>``, ``<``, ``>=``, and ``<=`` operators
-in the filter string; they must come between the key and value, and after
-the space that separates the key and value. 
+in the filter string to specify, respectively, "greater than", "less than",
+"greater than or equal to", and "less than or equal to"; they must come
+between the key and value, and after the space that separates the key
+and value:
 
 -  ``sid``
 -  ``cve``
