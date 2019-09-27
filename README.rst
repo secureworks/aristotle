@@ -93,7 +93,8 @@ The examples directory has .filter files that show examples of Boolean
 filter strings.
 
 Also in the ``examples`` directory is an ``example.rules`` file that has a dummy
-ruleset that implements the :doc:`BETTER Schema <BETTER>` 
+ruleset that implements the `BETTER
+Schema <https://github.com/secureworks/BETTER/>`__.
 
 `BETTER
 Schema <https://github.com/secureworks/BETTER/>`__. *This is not a real
