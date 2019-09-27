@@ -41,7 +41,7 @@ Metadata Key-Value Pairs
 In order for Aristotle to be useful, it must be provided a ruleset that
 has rules with the metadata keyword populated with appropriate key-value
 pairs. Aristotle assumes that the provided ruleset conforms to the
-`BETTER Schema <https://github.com/secureworks/BETTER/>`__.
+`BETTER Schema <https://github.com/secureworks/aristotle/blob/master/docs/BETTER.rst>`__.
 
 Setup
 =====
@@ -94,7 +94,7 @@ filter strings.
 
 Also in the ``examples`` directory is an ``example.rules`` file that has a dummy
 ruleset that implements the `BETTER
-Schema <https://github.com/secureworks/BETTER/>`__. *This is not a real
+Schema <https://github.com/secureworks/aristotle/blob/master/docs/BETTER.rst>`__. *This is not a real
 ruleset*. It is provided to assist in demonstrating the functionality of
 Aristotle.
 
@@ -213,7 +213,7 @@ uses the metadata key-value pairs as values in a (concrete)
       instead of the value from the rule's ``sid`` keyword although if the values
       differ, a warning will be raised.
    -  Note that per the
-      `BETTER Schema <https://github.com/secureworks/BETTER/>`__, a
+      `BETTER Schema <https://github.com/secureworks/aristotle/blob/master/docs/BETTER.rst>`__, a
       "sid" metadata key is not recommended but if present must have a
       value that matches the ``sid`` keyword value of the rule.
 
