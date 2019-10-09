@@ -5,6 +5,6 @@ Aristotle Documentation
    :maxdepth: 2
    :caption: Contents:
 
-   README
+   Aristotle
    BETTER
 
