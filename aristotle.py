@@ -108,9 +108,10 @@ class Ruleset():
 
     :param rules: a string containing a ruleset or a filename of a ruleset file
     :type rules: string, required
-    :param metadata_filter: A string that defines the desired outcome based on
+    :param metadata_filter: A string or a filename of a file that defines the
+        desired outcome based on
         Boolean logic, and uses the metadata key-value pairs as values in the
-        Boolean algebra. Defaults to None (can be provided later).
+        Boolean algebra. Defaults to None (can be set later with ``set_metadata_filter()``).
     :type metadata_filter: string, optional
     :param include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
     :type include_disabled_rules: boolean
@@ -143,15 +144,7 @@ class Ruleset():
             self.metadata_filter = None
             print_debug("No metadata_filter given to Ruleset() constructor")
         else:
-            try:
-                if os.path.isfile(metadata_filter):
-                    print_debug("Loading metadata_filter file '{}'.".format(metadata_filter))
-                    with open(metadata_filter, 'r') as fh:
-                        self.metadata_filter = fh.read()
-                else:
-                    self.metadata_filter = metadata_filter
-            except Exception as e:
-                print_error("Unable to process metadata_filter '{}':\n{}".format(metadata_filter, e), fatal=True)
+            self.set_metadata_filter(self, metadata_filter)
 
         self.include_disabled_rules = include_disabled_rules
         try:
@@ -159,6 +152,27 @@ class Ruleset():
         except Exception as e:
             print_error("Unable to process 'summary_max' value '{}' passed to Ruleset constructor:\n{}".format(summary_max, e))
         self.parse_rules()
+
+    def set_metadata_filter(self, metadata_filter):
+        """Sets the metadata filter to use.
+
+        :param metadata_filter: A string or a filename of a file that defines the
+            desired outcome based on
+            Boolean logic, and uses the metadata key-value pairs as values in the
+            Boolean algebra.
+        :type metadata_filter: string, required
+        :raises: `AristotleException`
+        """
+        try:
+            if os.path.isfile(metadata_filter):
+                print_debug("Loading metadata_filter file '{}'.".format(metadata_filter))
+                with open(metadata_filter, 'r') as fh:
+                    self.metadata_filter = fh.read()
+            else:
+                self.metadata_filter = metadata_filter
+        except Exception as e:
+            print_error("Unable to process metadata_filter '{}':\n{}".format(metadata_filter, e), fatal=True)
+
 
     def parse_rules(self):
         """Parses the ruleset and builds necessary data structures."""
@@ -291,7 +305,14 @@ class Ruleset():
             print_error("Unable to do CVE comparison '{} {} {}':\n{}".format(left_val, cmp_operator, right_val, e), fatal=True)
 
     def get_all_sids(self):
-        """Returns a list of all enabled SIDs (unless ``self.include_disabled_rules`` is True)."""
+        """Returns a list of all enabled SIDs.
+
+        If ``self.include_disabled_rules`` is True, then
+        all SIDs are returned.
+
+        :returns: list of all enabled SIDs.
+        :rtype: list
+        """
         return [s for s in self.metadata_dict.keys() if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
 
     def get_sids(self, kvpair, negate=False):
@@ -423,7 +444,8 @@ class Ruleset():
 
         :param metadata_filter: A string that defines the desired outcome based on
             Boolean logic, and uses the metadata key-value pairs as values in the
-            Boolean algebra. Defaults to ``self.metadata_filter``.
+            Boolean algebra. Defaults to ``self.metadata_filter`` which must be set
+            if this parameter is not set.
         :type metadata_filter: string, optional
         :returns: list of matching SIDs
         :rtype: list
@@ -480,9 +502,9 @@ class Ruleset():
               RESET + "\n")
 
     def get_stats(self, key, keyonly=False):
-        """Returns string of stats (total, enabled, disabled) for specified key and values.
+        """Returns string of statistics (total, enabled, disabled) for specified key and its values.
 
-        :param key: key to print stats for
+        :param key: key to print statistics for
         :type key: string, required
         :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
         :type keyonly: boolean, optional
@@ -512,14 +534,25 @@ class Ruleset():
         return retstr
 
     def print_stats(self, key, keyonly=False):
-        """Print stats to stdout."""
+        """Print statistics (total, enabled, disabled) for specified key and its values.
+
+        :param key: key to print statistics for
+        :type key: string, required
+        :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
+        :type key: boolean, optional
+        """
         stats_str = self.get_stats(key=key, keyonly=keyonly)
         if stats_str[-1] == '\n':
             stats_str = stats_str[:-1]
         print("{}".format(stats_str))
 
     def print_ruleset_summary(self, sids):
-        """Prints summary/truncated filtered ruleset to stdout."""
+        """Prints summary/truncated filtered ruleset to stdout.
+
+        :param sids: list of SIDs.
+        :type sids: list, required
+        :raises: `AristotleException`
+        """
         print_debug("print_ruleset_summary() called")
         print("")
         i = 0

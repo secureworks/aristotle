@@ -279,78 +279,8 @@ add desired Handler(s), e.g.:
 To use, create a Ruleset object and pass it a string containing the
 ruleset or a filename of a ruleset:
 
-\ *class Ruleset*\ (*self*, *rules*, *metadata\_filter=None*,
-*include\_disabled\_rules=False*, *summary\_max=16*)
-
-+---------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Parameters:   | **rules** (*string, required*) – a string containing a ruleset or a filename of a ruleset file                                                                                                                                    |
-|               |                                                                                                                                                                                                                                   |
-|               | **metadata\_filter** (*string, optional*) – A string that defines the desired outcome based on Boolean logic, and uses the metadata key-value pairs as values in the Boolean algebra. Defaults to `None` (can be provided later). |
-|               |                                                                                                                                                                                                                                   |
-|               | **include\_disabled\_rules** (*boolean*) – effectively enable all commented out rules when dealing with the ruleset, defaults to *False*                                                                                          |
-|               |                                                                                                                                                                                                                                   |
-|               | **summary\_max** (*int*) – the maximum number of rules to print when outputting summary/truncated filtered ruleset, defaults to *16*.                                                                                             |
-+---------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Raises:       | *AristotleException*                                                                                                                                                                                                              |
-+---------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-
-Statistics on the ruleset can be returned (if desired):
-
-\ *get\_stats*\ (**self**, **key**, **keyonly=False**)
-
-+----------------+-----------------------------------------------------------------------------------------------------------------------------------------------+
-| Parameters:    | **key** (*string, required*) – key to print stats for                                                                                         |
-|                |                                                                                                                                               |
-|                | **keyonly** (*boolean, optional*) – only print stats for the key itself and not stats for all possible key-value pairs, defaults to *False*   |
-+----------------+-----------------------------------------------------------------------------------------------------------------------------------------------+
-| Returns:       | string contaning stats, suitable for printing to stdout                                                                                       |
-+----------------+-----------------------------------------------------------------------------------------------------------------------------------------------+
-| Return type:   | string                                                                                                                                        |
-+----------------+-----------------------------------------------------------------------------------------------------------------------------------------------+
-| Raises:        | *AristotleException*                                                                                                                          |
-+----------------+-----------------------------------------------------------------------------------------------------------------------------------------------+
-
-If no value to the ``metadata_filter`` parameter is passed to the
-constructor, then at some
-point before filtering happens, a filter must be provided, either
-in the call to ``filter_ruleset()`` or the ``Ruleset`` object parameter
-set, e.g.:
-
-``myruleset.metatdata_filter = '<filter here>'``
-
-To filter the ruleset using the ``metadata_filter``, call
-filter\_ruleset(); if a filter has
-not been defined, it can be passed when calling this function.
-
-\ *filter\_ruleset*\ (**self**, **metadata\_filter=None**)
-
-+----------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Parameters:    | **metadata\_filter** (*string, optional*) – A string that defines the desired outcome based on Boolean logic, and uses the metadata key-value pairs as values in the Boolean algebra. Defaults to *self.metadata\_filter*.   |
-+----------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Returns:       | list of matching SIDs                                                                                                                                                                                                        |
-+----------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Return type:   | list                                                                                                                                                                                                                         |
-+----------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Raises:        | *AristotleException*                                                                                                                                                                                                         |
-+----------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-
-To output the ruleset, call ``output_rules()``:
-
-\ *output\_rules*\ (*self*, *sid\_list*, *outfile=None*)
-
-+----------------+-----------------------------------------------------------------------------------------------------------------+
-| Parameters:    | **sid\_list** (*list, required*) – list of SIDs of the rules to output                                          |
-|                |                                                                                                                 |
-|                | **outfile** (*string or None, optional*) – filename to output to; if None, output to stdout; defaults to None   |
-+----------------+-----------------------------------------------------------------------------------------------------------------+
-| Returns:       | None                                                                                                            |
-+----------------+-----------------------------------------------------------------------------------------------------------------+
-| Return type:   | NoneType                                                                                                        |
-+----------------+-----------------------------------------------------------------------------------------------------------------+
-| Raises:        | *AristotleException*                                                                                            |
-+----------------+-----------------------------------------------------------------------------------------------------------------+
-
-See the code/docstrings for more details on these and other functions.
+.. autoclass:: aristotle.Ruleset
+   :members: get_stats, set_metadata_filter, filter_ruleset, output_rules, get_all_sids, print_header, get_stats, print_stats, print_ruleset_summary
 
 License
 =======
