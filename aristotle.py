@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-"""Aristotle CLI
+"""Aristotle
 
-Command line tool for filtering Suricata and Snort rulesets based on metadata keyword values.
+Command line tool and library for filtering Suricata
+and Snort rulesets based on metadata keyword values.
 """
 # Copyright 2019 Secureworks
 #
