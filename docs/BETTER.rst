@@ -323,61 +323,62 @@ This ``metadata`` keyword in a rule:
 
 Results in this in the Suricata EVE JSON log:
 
-.. code:: json
+.. code-block:: json
 
-  "metadata": {
-    "protocols": [
-      "tcp",
-      "smtp"
-    ],
-    "mitre_attack": [
-      "t1190"
-    ],
-    "cvss_v2_temporal": [
-      "7.9"
-    ],
-    "cve": [
-      "2019-91325"
-    ],
-    "cvss_v3_temporal": [
-      "7.1"
-    ],
-    "attack_target": [
-      "smtp-server",
-      "server"
-    ],
-    "cvss_v2_base": [
-      "8.1"
-    ],
-    "rule_source": [
-      "acme-rule-factory"
-    ],
-    "priority": [
-      "medium"
-    ],
-    "filename": [
-      "exploit.rules"
-    ],
-    "updated_at": [
-      "2019-06-11"
-    ],
-    "capec_id": [
-      "248"
-    ],
-    "created_at": [
-      "2019-06-01"
-    ],
-    "hostile": [
-      "src_ip"
-    ],
-    "cvss_v3_base": [
-      "7.3"
-    ],
-    "cwe_id": [
-      "20"
-    ]
+  {
+    "metadata": {
+      "protocols": [
+        "tcp",
+        "smtp"
+      ],
+      "mitre_attack": [
+        "t1190"
+      ],
+      "cvss_v2_temporal": [
+        "7.9"
+      ],
+      "cve": [
+        "2019-91325"
+      ],
+      "cvss_v3_temporal": [
+        "7.1"
+      ],
+      "attack_target": [
+        "smtp-server",
+        "server"
+      ],
+      "cvss_v2_base": [
+        "8.1"
+      ],
+      "rule_source": [
+        "acme-rule-factory"
+      ],
+      "priority": [
+        "medium"
+      ],
+      "filename": [
+        "exploit.rules"
+      ],
+      "updated_at": [
+        "2019-06-11"
+      ],
+      "capec_id": [
+        "248"
+      ],
+      "created_at": [
+        "2019-06-01"
+      ],
+      "hostile": [
+        "src_ip"
+      ],
+      "cvss_v3_base": [
+        "7.3"
+      ],
+      "cwe_id": [
+        "20"
+      ]
+    }
   }
-
 
 Example 2
 ---------
@@ -392,47 +393,49 @@ This ``metadata`` keyword in a rule:
 
 Results in this in the Suricata EVE JSON log:
 
-.. code:: json
+.. code-block:: json
 
-  "metadata": {
-    "protocols": [
-      "tcp",
-      "http"
-    ],
-    "mitre_attack": [
-      "t1094"
-    ],
-    "attack_target": [
-      "client",
-      "http-client"
-    ],
-    "rule_source": [
-      "acme-rule-factory"
-    ],
-    "infected": [
-      "src_ip"
-    ],
-    "priority": [
-      "high"
-    ],
-    "filename": [
-      "acme.rules"
-    ],
-    "updated_at": [
-      "2016-04-02"
-    ],
-    "created_at": [
-      "2016-03-21"
-    ],
-    "hostile": [
-      "dest_ip"
-    ],
-    "malware": [
-      "post-infection"
-    ],
-    "cwe_id": [
-      "507"
-    ]
+  {
+    "metadata": {
+      "protocols": [
+        "tcp",
+        "http"
+      ],
+      "mitre_attack": [
+        "t1094"
+      ],
+      "attack_target": [
+        "client",
+        "http-client"
+      ],
+      "rule_source": [
+        "acme-rule-factory"
+      ],
+      "infected": [
+        "src_ip"
+      ],
+      "priority": [
+        "high"
+      ],
+      "filename": [
+        "acme.rules"
+      ],
+      "updated_at": [
+        "2016-04-02"
+      ],
+      "created_at": [
+        "2016-03-21"
+      ],
+      "hostile": [
+        "dest_ip"
+      ],
+      "malware": [
+        "post-infection"
+      ],
+      "cwe_id": [
+        "507"
+      ]
+    }
   }
 
 Tools
