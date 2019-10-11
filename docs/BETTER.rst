@@ -129,175 +129,246 @@ necessary to fully take advantage of the flexibility of this schema.
 Defined keys
 ~~~~~~~~~~~~
 
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Key                    | Example values     | Notes                                                                                                                                                                                                                    |
-+========================+====================+==========================+===============================================================================================================================================================================================+
-| **protocols**          | dcerpc             | Protocol(s) the rule is attempting to inspect.                                                                                                                                                                           |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | dhcp               | There is no distinction of type, function, layer, etc.                                                                                                                                                                   |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | dns                | Since it is generally assumed in this application, Internet Protocol (IP) is not included unless it is specified in the rule (e.g. "alert ip ....")                                                                      |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | ftp                | The protocol "tls" includes SSL; there should not be a bifurcation having SSL and TLS.                                                                                                                                   |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | http               |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | icmp               |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | imap               |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | irc                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | ldap               |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | ntp                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | pop                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | rpc                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | sip                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | smb                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | smtp               |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | snmp               |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | ssh                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | tcp                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | telnet             |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | tftp               |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | tls                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | udp                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | vnc                |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **attack\_target**     | http-server        | Defines what type asset is protected by this rule. Typically in the format of "<protocol>-server" or "<protocol>-client", with <protocol> not including layer 4 and below. One notable exception is "database-server".   |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | http-client        | "tls" includes SSL. Note that "tls-server" and "http-server" are distinct (same for "-client").                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | ftp-server         |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | tls-server         |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | dns-server         |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | sip-client         |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | database-server    |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | client             |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | server             |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **mitre\_attack**      | T1100              | MITRE ATT&CK Framework ID                                                                                                                                                                                                |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | T1068              | https://attack.mitre.org/                                                                                                                                                                                                |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | T1018              |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | T1046              |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **capec\_id**          | 118                | CAPEC ID number related to this rule.                                                                                                                                                                                    |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 210                | Only the integer value is used for key value.                                                                                                                                                                            |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 255                | https://capec.mitre.org/                                                                                                                                                                                                 |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **cwe\_id**            | 22                 | CWE ID number related to this rule.                                                                                                                                                                                      |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 506                | Only the integer value is used for key value.                                                                                                                                                                            |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 119                | `https://cwe.mitre.org <https://cwe.mitre.org/>`__\ `/ <https://cwe.mitre.org/>`__                                                                                                                                       |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **malware**            | malware            | If a rule detects on malware traffic, it should have a ``malware`` key (it may also have a malware related ``cwe_id`` and/or ``capec_id`` key).                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | post-infection     | This is not designed to label specific malware or malware families, but to identify the rule as malware related and communicate broad malware function. See `Appendix A <#appendixa>`__ for details on possible values.  |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | pre-infection      |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | download-attempt   |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **cve**                | 2015-0235          | CVE number related to this rule.                                                                                                                                                                                         |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 2019-10149         | Value does not include leading "CVE-" and maintains the dash ('-') between the year and sequence number.                                                                                                                 |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        |                    | https://cve.mitre.org/                                                                                                                                                                                                   |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **cvss\_v2\_base**     | 7.5                | CVSS version 2 base score for the vulnerability related to this rule.                                                                                                                                                    |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 10.0               | https://www.first.org/cvss/v2/guide#2-1-Base-Metrics                                                                                                                                                                     |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **cvss\_v2\_temporal** | 6.2                | CVSS version 2 temporal score for the vulnerability related to this rule.                                                                                                                                                |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 8.7                | https://www.first.org/cvss/v2/guide#2-2-Temporal-Metrics                                                                                                                                                                 |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **cvss\_v3\_base**     | 8.1                | CVSS version 3.x base score for the vulnerability related to this rule.                                                                                                                                                  |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 7.8                | There is no differentiation of minor versions of CVSS v3 (e.g. 3.0 vs 3.1).                                                                                                                                              |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        |                    | https://www.first.org/cvss/v3.0/specification-document#2-Base-Metrics                                                                                                                                                    |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        |                    | https://www.first.org/cvss/v3.1/specification-document#Base-Metrics                                                                                                                                                      |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **cvss\_v3\_temporal** | 7.7                | CVSS version 3.x temporal score for the vulnerability related to this rule.                                                                                                                                              |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 7.9                | There is no differentiation of minor versions of CVSS v3 (e.g. 3.0 vs 3.1).                                                                                                                                              |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        |                    | https://www.first.org/cvss/v3.0/specification-document#3-Temporal-Metrics                                                                                                                                                |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        |                    | https://www.first.org/cvss/v3.1/specification-document#Temporal-Metrics                                                                                                                                                  |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **priority**           | high               | For Suricata and Snort, this corresponds directly with "priority" keyword in the rule: high = 1; medium = 2; low = 3; info = 4; research = 5.                                                                            |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | medium             | See `Appendix B <#appendixb>`__ for details.                                                                                                                                                                             |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | low                |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | info               |                                                                                                                                                                                                                          |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | research           |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **hostile**            | src\_ip            | Which side of the alert is considered "hostile" (i.e. attacker, C2, etc.)                                                                                                                                                |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | dest\_ip           | This is the inverse of the "target" Suricata rule keyword (https://suricata.readthedocs.io/en/suricata-4.1.4/rules/meta.html#target).                                                                                    |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **infected**           | src\_ip            | Which side of the alert is the malware-infected host. Should only be present on malware-related rules.                                                                                                                   |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | dest\_ip           |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **created\_at**        | 2019-07-19         | Date the rule was created. Format is YYYY-MM-DD.                                                                                                                                                                         |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 2017-10-31         |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **updated\_at**        | 2019-04-02         | Date the rule was last updated. Format is YYYY-MM-DD.                                                                                                                                                                    |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | 2018-12-07         |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **filename**           | sw.rules           | If the ruleset was split into files, this would be the corresponding filename. Defined to help provide legacy compatibility mapping.                                                                                     |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | adware.rules       |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **classtype**          | trojan-activity    | Same as what is/would be found in the ``classtype`` rule keyword. Defined to help provide legacy compatibility mapping.                                                                                                  |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | shellcode-detect   | https://suricata.readthedocs.io/en/latest/rules/meta.html?highlight=classification%20keyword#classtype                                                                                                                   |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | policy-violation   | http://manual-snort-org.s3-website-us-east-1.amazonaws.com/node31.html#SECTION00446000000000000000                                                                                                                       |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **rule\_source**       | secureworks        | Vendor name or other identifier to label the source, author, and/or curator of the rule.                                                                                                                                 |
-|                        |                    |                                                                                                                                                                                                                          |
-|                        | emerging-threats   |                                                                                                                                                                                                                          |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| **sid**                | 8675309            | If used, the value of the key must be the same as that of the ``sid`` keyword in the rule and since this is redundant, the use of the "sid" key is not recommended.                                                      |
-+------------------------+--------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+.. list-table:: BETTER Keys and Values
+   :widths: 25 25 50
+   :header-rows: 1
 
-The values shown for the ``priority``, ``hostile``, and ``infected`` keys are the complete list for those keys.
+   * - Key
+     - Example Values
+     - Notes
+   * - **protocols**
+     - dcerpc
+
+       dhcp
+
+       dns
+
+       ftp
+
+       http
+
+       icmp
+
+       imap
+
+       irc
+
+       ldap
+
+       ntp
+
+       pop
+
+       rpc
+
+       sip
+
+       smb
+
+       smtp
+
+       snmp
+
+       ssh
+
+       tcp
+
+       telnet
+
+       tftp
+
+       tls
+
+       udp
+
+       vnc
+     - Protocol(s) the rule is attempting to inspect.
+
+       There is no distinction of type, function, layer, etc.
+
+       Since it is generally assumed in this application, Internet Protocol (IP) is not included unless it is specified in the rule (e.g. ``alert ip ...``)
+
+       The protocol “tls” includes SSL; there should not be a bifurcation having SSL and TLS.
+   * - **attack_target**
+     - http-server
+
+       http-client
+
+       ftp-server
+
+       tls-server
+
+       dns-server
+
+       sip-client
+
+       database-server
+
+       client
+
+       server
+     - Defines what type asset is protected by this rule.
+       Typically in the format of ``<protocol>-server`` or ``<protocol>-client``,
+       with <protocol> not including layer 4 and below. One notable exception
+       is ``database-server``.
+
+       ``tls`` includes SSL. Note that ``tls-server`` and ``http-server``
+       are distinct (same for ``-client``).
+   * - **mitre_attack**
+     - T1100
+
+       T1068
+
+       T1018
+
+       T1046
+     - MITRE ATT&CK Framework ID
+
+       `<https://attack.mitre.org/>`__
+   * - **capec_id**
+     - 118
+
+       210
+
+       255
+     - CAPEC ID number related to this rule.
+
+       Only the integer value is used for key value.
+
+       `<https://capec.mitre.org/>`__
+   * - **cwe_id**
+     - 22
+
+       506
+
+       119
+     - CWE ID number related to this rule.
+
+       Only the integer value is used for key value.
+
+       `<https://cwe.mitre.org/>`__
+   * - **malware**
+     - malware
+
+       post-infection
+
+       pre-infection
+
+       download-attempt
+     - If a rule detects on malware traffic, it should have a ``malware``
+       key (it may also have a malware related ``cwe_id`` and/or ``capec_id`` key).
+
+       This is not designed to label specific malware or malware families, but
+       to identify the rule as malware related and communicate broad malware
+       function. See `Appendix A <#appendixa>`__ for details on possible values.
+   * - **cve**
+     - 2015-0235
+
+       2019-10149
+     - CVE number related to this rule.
+
+       Value does not include leading “CVE-” and maintains the dash (‘-‘) between the year and sequence number.
+
+       `<https://cve.mitre.org/>`__
+   * - **cvss_v2_base**
+     - 7.5
+
+       10.0
+     - CVSS version 2 base score for the vulnerability related to this rule.
+
+       `<https://www.first.org/cvss/v2/guide#2-1-Base-Metrics>`__
+   * - **cvss_v2_temporal**
+     - 6.2
+
+       8.7
+     - CVSS version 2 temporal score for the vulnerability related to this rule.
+
+       `<https://www.first.org/cvss/v2/guide#2-2-Temporal-Metrics>`__
+   * - **cvss_v3_base**
+     - 8.1
+
+       7.8
+     - CVSS version 3.x base score for the vulnerability related to this rule.
+
+       There is no differentiation of minor versions of CVSS v3 (e.g. 3.0 vs 3.1).
+
+       `<https://www.first.org/cvss/v3.0/specification-document#2-Base-Metrics>`__
+   * - **cvss_v3_temporal**
+     - 7.7
+
+       7.9
+     - CVSS version 3.x temporal score for the vulnerability related to this rule.
+
+       There is no differentiation of minor versions of CVSS v3 (e.g. 3.0 vs 3.1).
+
+       `<https://www.first.org/cvss/v3.0/specification-document#3-Temporal-Metrics>`__
+
+       `<https://www.first.org/cvss/v3.1/specification-document#Temporal-Metrics>`__
+   * - **priority**
+     - high
+
+       medium
+
+       low
+
+       info
+
+       research
+     - For Suricata and Snort, this corresponds directly with “priority” keyword in the rule: high = 1; medium = 2; low = 3; info = 4; research = 5.
+
+       See `Appendix B <#appendixb>`__ for details.  
+   * - **hostile**
+     - src_ip
+
+       dest_ip
+     - Which side of the alert is considered “hostile” (i.e. attacker, C2, etc.)
+
+       This is the inverse of the “target” Suricata rule
+       keyword (`<https://suricata.readthedocs.io/en/suricata-4.1.4/rules/meta.html#target>`__).
+   * - **infected**
+     - src_ip
+
+       dest_ip
+     - Which side of the alert is the malware-infected host. Should only be present on malware-related rules.
+   * - **created_at**
+     - 2019-07-19
+
+       2017-10-31
+     - Date the rule was created. Format is YYYY-MM-DD.
+   * - **updated_at**
+     - 2019-04-02
+
+       2018-12-07
+     - Date the rule was last updated. Format is YYYY-MM-DD.
+   * - **filename**
+     - sw.rules
+
+       adware.rules
+     - If the ruleset was split into files, this would be the corresponding filename.
+       Defined to help provide legacy compatibility mapping.
+   * - **classtype**
+     - trojan-activity
+
+       shellcode-detect
+
+       policy-violation
+     - Same as what is/would be found in the ``classtype`` rule keyword. Defined to help provide legacy compatibility mapping.
+
+       `<https://suricata.readthedocs.io/en/latest/rules/meta.html?highlight=classification%20keyword#classtype>`__
+
+       `<http://manual-snort-org.s3-website-us-east-1.amazonaws.com/node31.html#SECTION00446000000000000000>`__
+   * - **rule_source**
+     - secureworks
+
+       emerging-threats
+     - Vendor name or other identifier to label the source, author, and/or curator of the rule.
+   * - **sid**
+     - 8675309
+     - If used, the value of the key must be the same as that of the ``sid`` keyword in the
+       rule and since this is redundant, the use of the “sid” key is not recommended.
+
+.. note::
+    The values shown for the ``priority``, ``hostile``, and ``infected`` keys are the complete list for those keys.
 
 
 Examples
@@ -452,7 +523,7 @@ Aristotle
 Authors
 =======
 
--  David Wharton, Secureworks Counter Threat Unit
+-  David Wharton, `Secureworks Counter Threat Unit <https://www.secureworks.com/counter-threat-unit>`__
 
 Appendices
 ==========

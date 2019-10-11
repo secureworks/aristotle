@@ -17,8 +17,9 @@ Aristotle takes in a ruleset and can provide statistics on the included
 metadata keys. If a filter string is provided, it will also be applied
 against the ruleset and the filtered ruleset outputted.
 
-Note: Aristotle does *not* modify the contents of rules. It simply
-includes or excludes rules based on the given Boolean filter string.
+.. note::
+    Aristotle does *not* modify the contents of rules. It simply
+    includes or excludes rules based on the given Boolean filter string.
 
 Aristotle is compatible with Python 2.7 and Python 3.x.
 
@@ -31,17 +32,17 @@ included in a rule. By defining key-value pairs and including them in
 the metadata keyword, ruleset providers can embed rich teleological and
 taxonomic information. This information can be used to filter a ruleset
 – essentially enabling and disabling rules in a ruleset based on the
-metadata key-value pairs. Aristotle allows for the easy leveraging of
+metadata key-value pairs.  Aristotle allows for the easy leveraging of
 the metadata key-value pairs to "slice-and-dice" Suricata and Snort
 rulesets that implement metadata key-value pairs.
 
 Metadata Key-Value Pairs
 ========================
 
-In order for Aristotle to be useful, it must be provided a ruleset that
-has rules with the metadata keyword populated with appropriate key-value
-pairs. Aristotle assumes that the provided ruleset conforms to the
-:doc:`BETTER Schema <BETTER>`.
+.. important:: In order for Aristotle to be useful, it must be provided a ruleset that
+    has rules with the metadata keyword populated with appropriate key-value
+    pairs. Aristotle assumes that the provided ruleset conforms to the
+    :doc:`BETTER Schema <BETTER>`.
 
 Setup
 =====
@@ -53,6 +54,8 @@ Install dependencies:
 Or if using as a library:
 
 *coming soon* ``pip install ....``
+
+And refer to :ref:`Aristotle as a Library`
 
 Usage
 =====
@@ -77,8 +80,9 @@ Usage
                           output file to write filtered ruleset to (default:
                           <stdout>)
     -s [STATS [STATS ...]], --stats [STATS [STATS ...]]
-                          display ruleset statistics about specified key(s)
-                          (default: None)
+                          display ruleset statistics about specified key(s). If
+                          no key(s) supplied, then summary statistics for all
+                          keys will be displayed. (default: None)
     -i, --include-disabled
                           include (effectively enable) disabled rules when
                           applying the filter (default: False)
@@ -89,7 +93,7 @@ Usage
 Example Files
 -------------
 
-The examples directory has .filter files that show examples of Boolean
+The examples directory has ``.filter`` files that show examples of Boolean
 filter strings.
 
 Also in the ``examples`` directory is an ``example.rules`` file that has a dummy
@@ -100,15 +104,42 @@ Aristotle.
 Example Usage
 -------------
 
-``python aristotle.py -r examples/example.rules -s``
+Show high level statistics on all the keys in the ``example.rules`` file:
 
-``python aristotle.py -r examples/example.rules -s protocols``
+.. code-block:: bash
 
-``python aristotle.py -r examples/example.rules -f examples/example1.filter --summary``
+    python aristotle.py -r examples/example.rules -s
 
-``python aristotle.py -r examples/example.rules -f examples/example1.filter -o newrules.rules``
+Show statistics on the ``protocols`` key in the ``example.rules`` file:
 
-``python aristotle.py -r examples/example.rules -f '"malware <ALL>" AND ("attack_target http-server" or "attack_target tls-server")' -o newrules.rules``
+.. code-block:: bash
+
+    python aristotle.py -r examples/example.rules -s protocols
+
+Apply the Boolean filter defined in the ``example1.filter`` file against the
+rules in the ``example.rules`` file and output summary results to stdout:
+
+.. code-block:: bash
+
+    python aristotle.py -r examples/example.rules -f examples/example1.filter --summary
+
+Apply the Boolean filter defined in the ``example1.filter`` file against the
+rules in the ``example.rules`` file and output the results to the file ``newrules.rules``:
+
+.. code-block:: bash
+
+    python aristotle.py -r examples/example.rules -f examples/example1.filter -o newrules.rules
+
+Apply the Boolean filter defined specified on the command line against the
+rules in the ``example.rules`` file and output the results to the file ``newrules.rules``:
+
+.. code-block:: bash
+
+    python aristotle.py -r examples/example.rules -f '"malware <ALL>" AND ("attack_target http-server" or "attack_target tls-server")' -o newrules.rules
+
+.. important:: Because Aristotle requires key-value pairs (values) in the filter string
+    to be enclosed in double quotes, a filter string specified on the command line must
+    be enclosed in single quotes.
 
 Statistics
 ----------
@@ -148,7 +179,7 @@ displayed:
     cvss_v2_temporal (Total: 1130; Enabled: 829; Disabled: 301)
     protocols (Total: 6799; Enabled: 4977; Disabled: 1822)
 
-If one of more key names are passed, summary info is displayed for those
+If one or more key names are passed, summary info is displayed for those
 keys:
 
 .. code:: text
@@ -197,7 +228,7 @@ A filter string defines the desired outcome based on Boolean logic, and
 uses the metadata key-value pairs as values in a (concrete)
 `Boolean algebra <https://en.wikipedia.org/wiki/Boolean_algebra>`__:
 
--  The Boolean operators AND, OR, and NOT are allowed.
+-  The Boolean operators ``AND``, ``OR``, and ``NOT`` are allowed.
 -  Grouping should be done with parentheses.
 -  **The key-value pair specifications must be surrounded by double
    quotes** (ASCII 0x22).
@@ -266,7 +297,7 @@ Aristotle can be imported and used like a normal library:
 
 ``import aristotle``
 
-For logging and/or output, attach to the logger named "aristotle" and
+For logging and/or output, attach to the logger named ``aristotle`` and
 add desired Handler(s), e.g.:
 
 .. code:: python
@@ -274,8 +305,10 @@ add desired Handler(s), e.g.:
   logger = logging.getLogger("aristotle")
   logger.addHandler(logging.StreamHandler())
 
-To use, create a Ruleset object and pass it a string containing the
-ruleset or a filename of a ruleset:
+To use, create a ``Ruleset`` object and pass it a string containing the
+ruleset or a filename of a ruleset  call, along with a filter string.
+Then call  ``filter_ruleset`` to get a
+list of SWIDs matching the filter string
 
 .. autoclass:: aristotle.Ruleset
    :members: get_stats, set_metadata_filter, filter_ruleset, output_rules, get_all_sids, print_header, get_stats, print_stats, print_ruleset_summary
