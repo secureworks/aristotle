@@ -307,8 +307,9 @@ class Ruleset():
     def get_all_sids(self):
         """Returns a list of all enabled SIDs.
 
-        If ``self.include_disabled_rules`` is True, then
-        all SIDs are returned.
+        .. note::
+            If ``self.include_disabled_rules`` is True, then
+            all SIDs are returned.
 
         :returns: list of all enabled SIDs.
         :rtype: list
@@ -594,14 +595,8 @@ class Ruleset():
                 print_error("Problem writing to file '{}':\n{}".format(outfile, e), fatal=True)
             print(GREEN + "Wrote {} rules to file, '{}'".format(len(sid_list), outfile) + RESET + "\n")
 
-def main():
-    """Main method, called if run as script."""
-    global aristotle_logger
-
-    # program is run not as library so add logging to console
-    aristotle_logger.addHandler(logging.StreamHandler())
-
-    # process command line args
+def get_parser():
+    """return parser for command line args"""
     try:
         parser = argparse.ArgumentParser(
             formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -648,7 +643,9 @@ AND "protocols pop" AND "protocols imap") OR "sid 80181444"'
                             dest="stats",
                             required=False,
                             default=None,
-                            help="display ruleset statistics about specified key(s)")
+                            help="display ruleset statistics about specified key(s). \
+                                  If no key(s) supplied, then summary statistics for \
+                                  all keys will be displayed.")
         parser.add_argument("-i", "--include-disabled",
                             action="store_true",
                             dest="include_disabled_rules",
@@ -667,9 +664,25 @@ AND "protocols pop" AND "protocols imap") OR "sid 80181444"'
                             default=False,
                             required=False,
                             help="turn on debug logging")
+        return parser
+    except Exception as e:
+        print_error("Problem parsing command line args: {}".format(e), fatal=True)
+
+
+def main():
+    """Main method, called if run as script."""
+    global aristotle_logger
+
+    # program is run not as library so add logging to console
+    aristotle_logger.addHandler(logging.StreamHandler())
+
+    # get command line args
+    try:
+        parser = get_parser()
         args = parser.parse_args()
     except Exception as e:
         print_error("Problem parsing command line args: {}".format(e), fatal=True)
+
 
 
     if args.debug:

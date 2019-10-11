@@ -43,6 +43,10 @@ release = u'1.0'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.githubpages',
+    'sphinx.ext.autosectionlabel',
+    'sphinx.ext.viewcode',
+#    'sphinxcontrib.programoutput',
+#    'sphinxcontrib.autoprogram',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
