@@ -41,7 +41,7 @@ Metadata Key-Value Pairs
 In order for Aristotle to be useful, it must be provided a ruleset that
 has rules with the metadata keyword populated with appropriate key-value
 pairs. Aristotle assumes that the provided ruleset conforms to the
-`BETTER Schema <https://github.com/secureworks/aristotle/blob/master/docs/BETTER.rst>`__.
+:doc:`BETTER Schema <BETTER>`.
 
 Setup
 =====
@@ -93,8 +93,7 @@ The examples directory has .filter files that show examples of Boolean
 filter strings.
 
 Also in the ``examples`` directory is an ``example.rules`` file that has a dummy
-ruleset that implements the `BETTER
-Schema <https://github.com/secureworks/aristotle/blob/master/docs/BETTER.rst>`__. *This is not a real
+ruleset that implements the :doc:`BETTER Schema <BETTER>`.  *This is not a real
 ruleset*. It is provided to assist in demonstrating the functionality of
 Aristotle.
 
@@ -212,8 +211,7 @@ uses the metadata key-value pairs as values in a (concrete)
    -  If the ruleset ``metadata`` actually contains a "sid" key, it will be used
       instead of the value from the rule's ``sid`` keyword although if the values
       differ, a warning will be raised.
-   -  Note that per the
-      `BETTER Schema <https://github.com/secureworks/aristotle/blob/master/docs/BETTER.rst>`__, a
+   -  Note that per the :doc:`BETTER Schema <BETTER>`, a
       "sid" metadata key is not recommended but if present must have a
       value that matches the ``sid`` keyword value of the rule.
 
@@ -285,7 +283,7 @@ ruleset or a filename of a ruleset:
 License
 =======
 
-Aristotle is licensed under the Apache License, Version 2.0.
+Aristotle is licensed under the `Apache License, Version 2.0 <https://github.com/secureworks/aristotle/blob/master/LICENSE>`__.
 
 Authors
 =======

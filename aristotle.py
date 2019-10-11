@@ -539,7 +539,7 @@ class Ruleset():
         :param key: key to print statistics for
         :type key: string, required
         :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
-        :type key: boolean, optional
+        :type keyonly: boolean, optional
         """
         stats_str = self.get_stats(key=key, keyonly=keyonly)
         if stats_str[-1] == '\n':
