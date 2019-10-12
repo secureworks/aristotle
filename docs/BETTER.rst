@@ -68,9 +68,7 @@ and `Snort metadata
 keyword <http://manual-snort-org.s3-website-us-east-1.amazonaws.com/node31.html#SECTION00448000000000000000>`__
 allow for non-functional (in terms of detection) information to be
 included (embedded) within a rule. The contents of the
-``metadata`` keyword can be structured as key-value pairs. Other IDS rules
-may support similar functionality.
-
+``metadata`` keyword can be structured as comma separated key-value pairs.
 
 Details
 -------
@@ -129,7 +127,7 @@ necessary to fully take advantage of the flexibility of this schema.
 Defined keys
 ~~~~~~~~~~~~
 
-.. list-table:: BETTER Keys and Values
+.. list-table:: BETTER Defined Keys
    :widths: 25 25 50
    :header-rows: 1
 
@@ -186,7 +184,7 @@ Defined keys
 
        There is no distinction of type, function, layer, etc.
 
-       Since it is generally assumed in this application, Internet Protocol (IP) is not included unless it is specified in the rule (e.g. ``alert ip ...``)
+       Since it is generally assumed in this context, Internet Protocol (IP) is not included unless it is specified in the rule (e.g. ``alert ip ...``)
 
        The protocol “tls” includes SSL; there should not be a bifurcation having SSL and TLS.
    * - **attack_target**
@@ -213,7 +211,7 @@ Defined keys
        is ``database-server``.
 
        ``tls`` includes SSL. Note that ``tls-server`` and ``http-server``
-       are distinct (same for ``-client``).
+       are distinct (same for ``tls-client`` and ``tls-server``).
    * - **mitre_attack**
      - T1100
 
@@ -260,7 +258,7 @@ Defined keys
 
        This is not designed to label specific malware or malware families, but
        to identify the rule as malware related and communicate broad malware
-       function. See `Appendix A <#appendixa>`__ for details on possible values.
+       function. See `Appendix A <#appendixa>`__ for details on example values.
    * - **cve**
      - 2015-0235
 
