@@ -10,7 +10,7 @@ setup(
     description="A a Python script and library for the viewing and filtering of Suricata and Snort rulesets based on interpreted key-value pairs present in the metadata keyword within each rule.",
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    url="https://github.com/secureworks/aristotle,
+    url="https://github.com/secureworks/aristotle",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 5 - Production/Stable",
