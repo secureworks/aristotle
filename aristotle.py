@@ -228,7 +228,7 @@ class Ruleset():
                             continue
                         k, v = kvsplit
                         if k == "sid" and int(v) != sid:
-                            # this is in violation of the BETTER schema, should we error and die?
+                            # this is in violation of the BETTER schema, throw warning
                             print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'. This may lead to unexpected results".format(lineno, v, sid))
                         # populate metadata_dict
                         if k not in self.metadata_dict[sid]['metadata'].keys():
@@ -246,8 +246,6 @@ class Ruleset():
                     # be cast as str when used the same way other keys and values are used.
                     self.metadata_dict[sid]['metadata']['sid'] = [str(sid)]
                     self.keys_dict['sid'][str(sid)] = [sid]
-            #print_debug("metadata_dict:\n{}".format(self.metadata_dict))
-            #print_debug("keys_dict:\n{}".format(self.keys_dict))
 
         except Exception as e:
             print_error("Problem loading rules: {}".format(e), fatal=True)
@@ -258,7 +256,6 @@ class Ruleset():
         May have unexpected results if CVE values (left_val, right_val) not formatted as CVE numbers.
         Returns boolean.
         """
-        #print_debug("cve_compare() called. left_val: {}, right_val: {}, cmp_operator: {}".format(left_val, right_val, cmp_operator))
         try:
             if '-' not in left_val:
                 lyear = int(left_val)
@@ -293,7 +290,6 @@ class Ruleset():
                     rseq += 1
                 else:
                     lseq += 1
-            #print_debug("lyear: {}, lseq: {}  ...  ryear: {}, rseq: {}".format(lyear,lseq,ryear,rseq))
             if cmp_operator[0] == '<':
                 if lyear == ryear:
                     return lseq < rseq
