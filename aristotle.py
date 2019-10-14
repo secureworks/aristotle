@@ -202,6 +202,8 @@ class Ruleset():
                 matchobj = metadata_keyword_re.search(line)
                 if matchobj:
                     metadata_str = matchobj.group("METADATA")
+                else:
+                    print_warning("No 'metatdata' keyword found in sid {}".format(sid))
                 if (lineno % 1000 == 0):
                     print_debug("metadata_str for sid {}:\n{}".format(sid, metadata_str))
 
@@ -215,28 +217,29 @@ class Ruleset():
                     self.metadata_dict[sid]['disabled'] = True
                     self.metadata_dict[sid]['default-disabled'] = True
 
-                for kvpair in metadata_str.split(','):
-                    # key-value pairs are case insensitive; make everything lower case
-                    # also remove extra spaces before, after, and between key and value
-                    kvsplit = [e.strip() for e in kvpair.lower().strip().split(' ', 1)]
-                    if len(kvsplit) < 2:
-                        # just a single word in metadata. warn and skip
-                        print_warning("Single word metadata value found, ignoring '{}' in sid {}".format(kvpair, sid))
-                        continue
-                    k, v = kvsplit
-                    if k == "sid" and int(v) != sid:
-                        # this is in violation of the BETTER schema, should we error and die?
-                        print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'. This may lead to unexpected results".format(lineno, v, sid))
-                    # populate metadata_dict
-                    if k not in self.metadata_dict[sid]['metadata'].keys():
-                        self.metadata_dict[sid]['metadata'][k] = []
-                    self.metadata_dict[sid]['metadata'][k].append(v)
-                    # populate keys_dict
-                    if k not in self.keys_dict.keys():
-                        self.keys_dict[k] = {}
-                    if v not in self.keys_dict[k].keys():
-                        self.keys_dict[k][v] = []
-                    self.keys_dict[k][v].append(sid)
+                if len(metadata_str) > 0:
+                    for kvpair in metadata_str.split(','):
+                        # key-value pairs are case insensitive; make everything lower case
+                        # also remove extra spaces before, after, and between key and value
+                        kvsplit = [e.strip() for e in kvpair.lower().strip().split(' ', 1)]
+                        if len(kvsplit) < 2:
+                            # just a single word in metadata. warn and skip
+                            print_warning("Single word metadata value found, ignoring '{}' in sid {}".format(kvpair, sid))
+                            continue
+                        k, v = kvsplit
+                        if k == "sid" and int(v) != sid:
+                            # this is in violation of the BETTER schema, should we error and die?
+                            print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'. This may lead to unexpected results".format(lineno, v, sid))
+                        # populate metadata_dict
+                        if k not in self.metadata_dict[sid]['metadata'].keys():
+                            self.metadata_dict[sid]['metadata'][k] = []
+                        self.metadata_dict[sid]['metadata'][k].append(v)
+                        # populate keys_dict
+                        if k not in self.keys_dict.keys():
+                            self.keys_dict[k] = {}
+                        if v not in self.keys_dict[k].keys():
+                            self.keys_dict[k][v] = []
+                        self.keys_dict[k][v].append(sid)
                 # add sid as pseudo metadata key unless it already exist
                 if 'sid' not in self.metadata_dict[sid]['metadata'].keys():
                     # keys and values are strings; variable "sid" is int so must
