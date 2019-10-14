@@ -145,7 +145,7 @@ class Ruleset():
             self.metadata_filter = None
             print_debug("No metadata_filter given to Ruleset() constructor")
         else:
-            self.set_metadata_filter(self, metadata_filter)
+            self.set_metadata_filter(metadata_filter)
 
         self.include_disabled_rules = include_disabled_rules
         try:
