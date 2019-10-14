@@ -23,6 +23,8 @@ Aristotle is compatible with Python 2.7 and Python 3.x.
 
 ::
 
+    *** IMPORTANT ***
+
     In order for Aristotle to be useful, it must be provided a ruleset that
     has rules with the metadata keyword populated with appropriate key-value
     pairs. Aristotle assumes that the provided ruleset conforms to the
