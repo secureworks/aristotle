@@ -314,7 +314,7 @@ Defined keys
        research
      - For Suricata and Snort, this corresponds directly with “priority” keyword in the rule: high = 1; medium = 2; low = 3; info = 4; research = 5.
 
-       See `Appendix B <#appendixb>`__ for details.  
+       See `Appendix B <#appendixb>`__ for details.
    * - **hostile**
      - src_ip
 
