@@ -311,7 +311,20 @@ add desired Handler(s), e.g.:
 To use, create a ``Ruleset`` object and pass it a string containing the
 ruleset or a filename of a ruleset, along with a filter string.
 Then call  the ``Ruleset`` object's ``filter_ruleset()`` function
-to get a list of SWIDs matching the filter string.
+to get a list of SIDs matching the filter string.
+
+Example:
+
+.. code-block:: python
+
+    import aristotle
+
+    a = aristotle.Ruleset("examples/example.rules")
+    a.set_metadata_filter("examples/example1.filter")
+    sids = a.filter_ruleset()
+
+
+``Ruleset`` class and functions:
 
 .. autoclass:: aristotle.Ruleset
    :members: get_stats, set_metadata_filter, filter_ruleset, output_rules, get_all_sids, print_header, get_stats, print_stats, print_ruleset_summary
