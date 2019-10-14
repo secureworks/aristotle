@@ -107,6 +107,11 @@ conform to the :doc:`BETTER Schema <BETTER>`.
 Example Usage
 -------------
 
+.. note::
+    ``aristotle.py`` in the root of the repository is a symlink
+    to ``aristotle/aristotle.py``.  If the evironment in use does
+    not recognize symlinks, adjust the paths accordingly.
+
 Show high level statistics on all the keys in the ``example.rules`` file:
 
 .. code-block:: bash
