@@ -93,13 +93,16 @@ Usage
 Example Files
 -------------
 
-The examples directory has ``.filter`` files that show examples of Boolean
+The ``examples`` directory has ``.filter`` files that show examples of Boolean
 filter strings.
 
 Also in the ``examples`` directory is an ``example.rules`` file that has a dummy
-ruleset that implements the :doc:`BETTER Schema <BETTER>`.  *This is not a real
-ruleset*. It is provided to assist in demonstrating the functionality of
-Aristotle.
+Suricata ruleset that implements the :doc:`BETTER Schema <BETTER>`.  While the example
+ruleset is syntactically correct, *it is not a real ruleset*
+intended to be used by a Suricata sensor.
+It is provided to assist in demonstrating the functionality of
+Aristotle and to provide examples of rules with ``metadata`` keywords that
+conform to the :doc:`BETTER Schema <BETTER>`.
 
 Example Usage
 -------------
@@ -243,10 +246,10 @@ uses the metadata key-value pairs as values in a (concrete)
       instead of the value from the rule's ``sid`` keyword although if the values
       differ, a warning will be raised.
    -  Note that per the :doc:`BETTER Schema <BETTER>`, a
-      "sid" metadata key is not recommended but if present must have a
+      "sid" metadata key is not recommended but if present, it must have a
       value that matches the ``sid`` keyword value of the rule.
 
--  Extraneous whitespace, including newlines, is allowed in the filter
+-  Extraneous whitespace, including newlines, *is* allowed in the filter
    string.
 
 The following keys support the ``>``, ``<``, ``>=``, and ``<=`` operators
@@ -306,9 +309,9 @@ add desired Handler(s), e.g.:
   logger.addHandler(logging.StreamHandler())
 
 To use, create a ``Ruleset`` object and pass it a string containing the
-ruleset or a filename of a ruleset  call, along with a filter string.
-Then call  ``filter_ruleset`` to get a
-list of SWIDs matching the filter string
+ruleset or a filename of a ruleset, along with a filter string.
+Then call  the ``Ruleset`` object's ``filter_ruleset()`` function
+to get a list of SWIDs matching the filter string.
 
 .. autoclass:: aristotle.Ruleset
    :members: get_stats, set_metadata_filter, filter_ruleset, output_rules, get_all_sids, print_header, get_stats, print_stats, print_ruleset_summary
