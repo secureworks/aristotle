@@ -21,14 +21,12 @@ against the ruleset and the filtered ruleset outputted.
 
 Aristotle is compatible with Python 2.7 and Python 3.x.
 
-::
-
-    *** IMPORTANT ***
-
-    In order for Aristotle to be useful, it must be provided a ruleset that
-    has rules with the metadata keyword populated with appropriate key-value
-    pairs. Aristotle assumes that the provided ruleset conforms to the
-    :doc:`BETTER Schema <BETTER>`.
++------------------------------------------------------------------------------------+
+| In order for Aristotle to be useful, it must be provided a ruleset that            |
+| has rules with the metadata keyword populated with appropriate key-value           |
+| pairs. Aristotle assumes that the provided ruleset conforms to the                 |
+| `BETTER Schema <https://aristotle-better.readthedocs.io/en/latest/BETTER.html>`__. |
++------------------------------------------------------------------------------------+
 
 Setup
 =====
@@ -39,9 +37,9 @@ Install dependencies:
 
 Or if using as a library:
 
-*coming soon* ``pip install ....``
+``pip install aristotle``
 
-And refer to :ref:`Aristotle as a Library`
+And refer to `Aristotle as a Library <https://aristotle-better.readthedocs.io/en/latest/Aristotle.html#aristotle-as-a-library>`__.
 
 Usage
 =====

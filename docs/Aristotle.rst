@@ -53,7 +53,7 @@ Install dependencies:
 
 Or if using as a library:
 
-*coming soon* ``pip install ....``
+``pip install aristotle``
 
 And refer to :ref:`Aristotle as a Library`
 
