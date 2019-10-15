@@ -10,7 +10,7 @@ script or utilized as a library.
 Documentation
 =============
 
-`<https://aristotle-better.readthedocs.io/en/latest/>`__
+`<https://aristotle-better.readthedocs.io/>`__
 
 Application Overview
 ====================
