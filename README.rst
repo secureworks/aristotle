@@ -10,7 +10,7 @@ script or utilized as a library.
 Documentation
 =============
 
-TBD
+`<https://aristotle-better.readthedocs.io/en/latest/>`__
 
 Application Overview
 ====================
