@@ -1,0 +1,15 @@
+(
+    (
+        "protocols http"
+    OR
+        "protocols tls"
+    )
+  AND
+    (
+        "priority high"
+    )
+)
+OR
+(
+    "cve 2018-17994"
+)
