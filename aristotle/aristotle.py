@@ -456,6 +456,7 @@ class Ruleset():
             metadata_filter = self.metadata_filter
         if metadata_filter is None:
             print_error("No metadata_filter set or passed to filter_ruleset()", fatal=True)
+        metadata_filter_original = metadata_filter
         # the boolean.py library uses tokenize which isn't designed to
         # handle multi-word tokens (and doesn't support quoting). So
         # just replace and map to single word. This way we can still
@@ -480,13 +481,14 @@ class Ruleset():
             # replace in filter str
             metadata_filter = metadata_filter.replace(t, hashstr)
 
-        print_debug(metadata_filter)
+        print_debug("{}".format(metadata_filter_original))
+        print_debug("\t{}".format(metadata_filter))
         try:
             algebra = boolean.BooleanAlgebra()
             mytree = algebra.parse(metadata_filter).literalize().simplify()
             return self.evaluate(mytree)
         except Exception as e:
-            print_error("Problem processing metadata_filter string:\n\n{}\n\nError:\n{}".format(metadata_filter, e), fatal=True)
+            print_error("Problem processing metadata_filter string:\n\n{}\n\nError:\n{}".format(metadata_filter_original, e), fatal=True)
 
     def print_header(self):
         """Prints vanity header and global stats."""
