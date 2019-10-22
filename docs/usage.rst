@@ -1,62 +1,3 @@
-=========
-Aristotle
-=========
-
-Aristotle is a simple Python program that allows for the filtering of
-Suricata and Snort rulesets based on interpreted key-value pairs present
-in the metadata keyword within each rule. It can be run as a standalone
-script or utilized as a library.
-
-.. contents::
-   :depth: 5
-
-Application Overview
-====================
-
-Aristotle takes in a ruleset and can provide statistics on the included
-metadata keys. If a filter string is provided, it will also be applied
-against the ruleset and the filtered ruleset outputted.
-
-.. note::
-    Aristotle does *not* modify the contents of rules. It simply
-    includes or excludes rules based on the given Boolean filter string.
-
-Aristotle is compatible with Python 2.7 and Python 3.x.
-
-Background
-==========
-
-Suricata and Snort support the ``metadata`` keyword that allows for
-non-functional (in terms of detection), arbitrary information to be
-included in a rule. By defining key-value pairs and including them in
-the metadata keyword, ruleset providers can embed rich teleological and
-taxonomic information. This information can be used to filter a ruleset
-– essentially enabling and disabling rules in a ruleset based on the
-metadata key-value pairs.  Aristotle allows for the easy leveraging of
-the metadata key-value pairs to "slice-and-dice" Suricata and Snort
-rulesets that implement metadata key-value pairs.
-
-Metadata Key-Value Pairs
-========================
-
-.. important:: In order for Aristotle to be useful, it must be provided a ruleset that
-    has rules with the metadata keyword populated with appropriate key-value
-    pairs. Aristotle assumes that the provided ruleset conforms to the
-    :doc:`BETTER Schema <BETTER>`.
-
-Setup
-=====
-
-Install dependencies:
-
-``pip install -r requirements.txt``
-
-Or if using as a library:
-
-``pip install aristotle``
-
-And refer to :ref:`Aristotle as a Library`
-
 Usage
 =====
 
@@ -97,12 +38,13 @@ The ``examples`` directory has ``.filter`` files that show examples of Boolean
 filter strings.
 
 Also in the ``examples`` directory is an ``example.rules`` file that has a dummy
-Suricata ruleset that implements the :doc:`BETTER Schema <BETTER>`.  While the example
+Suricata ruleset that implements the `BETTER Schema <https://better-schema.readthedocs.io/>`__.
+While the example
 ruleset is syntactically correct, *it is not a real ruleset*
 intended to be used by a Suricata sensor.
 It is provided to assist in demonstrating the functionality of
 Aristotle and to provide examples of rules with ``metadata`` keywords that
-conform to the :doc:`BETTER Schema <BETTER>`.
+conform to the `BETTER Schema <https://better-schema.readthedocs.io/>`__.
 
 Example Usage
 -------------
@@ -229,117 +171,3 @@ keys:
       tftp (Total: 1; Enabled: 0; Disabled: 1)
       ssh (Total: 9; Enabled: 4; Disabled: 5)
 
-Boolean Filter Strings
-======================
-
-A filter string defines the desired outcome based on Boolean logic, and
-uses the metadata key-value pairs as values in a (concrete)
-`Boolean algebra <https://en.wikipedia.org/wiki/Boolean_algebra>`__:
-
--  The Boolean operators ``AND``, ``OR``, and ``NOT`` are allowed.
--  Grouping should be done with parentheses.
--  **The key-value pair specifications must be surrounded by double
-   quotes** (ASCII 0x22).
--  **To match all values of a key**, use the pseudo-value "<ALL>" (not case
-   sensitive), e.g. ``"malware <ALL>"``.
--  **To match a specific SID**, use the "sid" key, e.g. "sid 80181444", even
-   though it may not be present in the ``metadata`` value.
-
-   -  A (pseudo) key of "sid" with the value of the rule's ``sid`` keyword
-      is added to the internal key-value pair data structure(s).
-   -  If the ruleset ``metadata`` actually contains a "sid" key, it will be used
-      instead of the value from the rule's ``sid`` keyword although if the values
-      differ, a warning will be raised.
-   -  Note that per the :doc:`BETTER Schema <BETTER>`, a
-      "sid" metadata key is not recommended but if present, it must have a
-      value that matches the ``sid`` keyword value of the rule.
-
--  Extraneous whitespace, including newlines, *is* allowed in the filter
-   string.
-
-The following keys support the ``>``, ``<``, ``>=``, and ``<=`` operators
-in the filter string to specify, respectively, "greater than", "less than",
-"greater than or equal to", and "less than or equal to"; they must come
-between the key and value, and after the space that separates the key
-and value:
-
--  ``sid``
--  ``cve``
--  ``cvss_v2_base``
--  ``cvss_v2_temporal``
--  ``cvss_v3_base``
--  ``cvss_v3_temporal``
--  ``created_at``
--  ``updated_at``
-
-Example Filter Strings
-----------------------
-
-Match all high priority malware related rules:
-
-``"priority high" AND "malware <ALL>"``
-
-Match all high priority malware related rules that were created in 2018
-or later:
-
-``("priority high" AND "malware <ALL>") AND "created_at > 2018-01-01"``
-
-Match all high and medium rules that are designed to protect a
-webserver:
-
-``("priority high" OR "priority medium") AND ("attack_target http-server"
-OR "attack_target tls-server")``
-
-Match all high priority rules that were created in 2019 or involve a
-vulnerability (based on CVE number) from 2018 or later:
-
-``"priority high" AND (("created_at >= 2019-01-01" AND "created_at <=
-2019-12-31") OR "cve >= 2018-0000")``
-
-See more in the ``examples`` directory.
-
-Aristotle as a Library
-======================
-
-Aristotle can be imported and used like a normal library:
-
-``import aristotle``
-
-For logging and/or output, attach to the logger named ``aristotle`` and
-add desired Handler(s), e.g.:
-
-.. code:: python
-
-  logger = logging.getLogger("aristotle")
-  logger.addHandler(logging.StreamHandler())
-
-To use, create a ``Ruleset`` object and pass it a string containing the
-ruleset or a filename of a ruleset, along with a filter string.
-Then call  the ``Ruleset`` object's ``filter_ruleset()`` function
-to get a list of SIDs matching the filter string.
-
-Example:
-
-.. code-block:: python
-
-    import aristotle
-
-    a = aristotle.Ruleset("examples/example.rules")
-    a.set_metadata_filter("examples/example1.filter")
-    sids = a.filter_ruleset()
-
-
-``Ruleset`` class and functions:
-
-.. autoclass:: aristotle.Ruleset
-   :members: get_stats, set_metadata_filter, filter_ruleset, output_rules, get_all_sids, print_header, get_stats, print_stats, print_ruleset_summary
-
-License
-=======
-
-Aristotle is licensed under the `Apache License, Version 2.0 <https://github.com/secureworks/aristotle/blob/master/LICENSE>`__.
-
-Authors
-=======
-
--  David Wharton

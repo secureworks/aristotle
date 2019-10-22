@@ -1,10 +1,23 @@
+=======================
 Aristotle Documentation
 =======================
 
+Summary
+=======
+
+Aristotle is a simple Python program that allows for the filtering of
+Suricata and Snort rulesets based on interpreted key-value pairs present
+in the metadata keyword within each rule. It can be run as a standalone
+script or utilized as a library.
+
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: -1
    :caption: Contents:
 
-   Aristotle
-   BETTER
+   overview
+   setup
+   usage
+   filter_strings
+   library
+   license-authors
 
