@@ -10,7 +10,7 @@ script or utilized as a library.
 Documentation
 =============
 
-`<https://aristotle-better.readthedocs.io/>`__
+`<https://aristotle-py.readthedocs.io/>`__
 
 Application Overview
 ====================
@@ -25,7 +25,7 @@ Aristotle is compatible with Python 2.7 and Python 3.x.
 | In order for Aristotle to be useful, it must be provided a ruleset that            |
 | has rules with the metadata keyword populated with appropriate key-value           |
 | pairs. Aristotle assumes that the provided ruleset conforms to the                 |
-| `BETTER Schema <https://aristotle-better.readthedocs.io/en/latest/BETTER.html>`__. |
+| `BETTER Schema <https://better-schema.readthedocs.io/>`__.                         |
 +------------------------------------------------------------------------------------+
 
 Setup
@@ -39,7 +39,7 @@ Or if using as a library:
 
 ``pip install aristotle``
 
-And refer to `Aristotle as a Library <https://aristotle-better.readthedocs.io/en/latest/Aristotle.html#aristotle-as-a-library>`__.
+And refer to `Aristotle as a Library <https://aristotle-py.readthedocs.io/en/latest/library.html>`__.
 
 Usage
 =====
