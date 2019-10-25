@@ -2,5 +2,5 @@
     ( "priority high" AND "malware <ALL>")
     AND "created_at > 2018-01-01"
 ) 
-AND NOT ("protocols smtp" AND "protocols pop" AND "protocols imap")
+AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap")
 OR "sid 80181444"
