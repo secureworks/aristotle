@@ -1,3 +1,5 @@
+# match any high priority alert involving HTTP or TLS;
+# also include CVE-2018-17994
 (
     (
         "protocols http"

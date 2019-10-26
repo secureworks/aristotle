@@ -1,0 +1,10 @@
+# Match all high priority rules that were created in 2019 or
+# involve a vulnerability (based on CVE number) from 2018 or later.
+
+  "priority high"
+AND 
+  (
+      ("created_at >= 2019-01-01" AND "created_at <= 2019-12-31")
+    OR 
+      "cve >= 2018-0000"
+  )
