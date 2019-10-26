@@ -167,8 +167,13 @@ class Ruleset():
         try:
             if os.path.isfile(metadata_filter):
                 print_debug("Loading metadata_filter file '{}'.".format(metadata_filter))
+                self.metadata_filter = ""
                 with open(metadata_filter, 'r') as fh:
-                    self.metadata_filter = fh.read()
+                    for line in fh:
+                        # strip out comments and ignore blank lines
+                        if line.strip().startswith('#') or len(line.strip()) == 0:
+                            continue
+                        self.metadata_filter += line
             else:
                 self.metadata_filter = metadata_filter
         except Exception as e:
