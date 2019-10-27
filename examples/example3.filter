@@ -1,0 +1,8 @@
+# Match all high and medium rules that are designed to
+# protect a webserver.
+
+  ("priority high" OR "priority medium")
+
+AND
+
+  ("attack_target http-server" OR "attack_target tls-server")
