@@ -25,8 +25,12 @@ uses the metadata key-value pairs as values in a (concrete)
 
 -  Extraneous whitespace, including newlines, *is* allowed in the filter
    string.
--  If a file containing a Boolean filter string is supplied, lines beginning
-   with '#' are considered comments and are ignored.
+-  If a file containing a Boolean filter string is supplied:
+
+   - Lines beginning with '#' are considered comments and are ignored.
+   - A line starting with the string ``<enable-all-rules>`` results in
+     enabling all rules, including disabled ones, before applying
+     the Boolean filter.
 
 The following keys support the ``>``, ``<``, ``>=``, and ``<=`` operators
 in the filter string to specify, respectively, "greater than", "less than",
