@@ -14,6 +14,6 @@
     )
   AND
     (
-        "attack_target http-server" OR "attack-target tls-server"
+        "attack_target http-server" OR "attack_target tls-server"
     )
 )
