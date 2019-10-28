@@ -5,7 +5,7 @@ with open("README.rst", "r") as fh:
 
 setup(
     name="aristotle",
-    version="1.0.2",
+    version="1.0.3",
     author="David Wharton",
     description="Script and library for the viewing and filtering of Suricata and Snort rulesets based on interpreted key-value pairs present in the metadata keyword within each rule.",
     long_description=long_description,
