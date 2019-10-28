@@ -120,15 +120,16 @@ class Ruleset():
     :type summary_max: int, optional
     :raises: `AristotleException`
     """
-    # dict keys are sids
-    metadata_dict = {}
-    # dict keys are keys from metadata key-value pairs
-    keys_dict = {'sid': {}}
-    # dict keys are hash of key-value pairs from passed in filter string/file
-    metadata_map = {}
-
     def __init__(self, rules, metadata_filter=None, include_disabled_rules=False, summary_max=16):
         """Constructor."""
+
+        # dict keys are sids
+        self.metadata_dict = {}
+        # dict keys are keys from metadata key-value pairs
+        self.keys_dict = {'sid': {}}
+        # dict keys are hash of key-value pairs from passed in filter string/file
+        self.metadata_map = {}
+
         try:
             if os.path.isfile(rules):
                 with open(rules, 'r') as fh:
@@ -141,13 +142,14 @@ class Ruleset():
         except Exception as e:
             print_error("Unable to process rules '{}':\n{}".format(rules, e), fatal=True)
 
+        self.include_disabled_rules = include_disabled_rules
+
         if not metadata_filter:
             self.metadata_filter = None
             print_debug("No metadata_filter given to Ruleset() constructor")
         else:
             self.set_metadata_filter(metadata_filter)
 
-        self.include_disabled_rules = include_disabled_rules
         try:
             self.summary_max = int(summary_max)
         except Exception as e:
@@ -167,8 +169,18 @@ class Ruleset():
         try:
             if os.path.isfile(metadata_filter):
                 print_debug("Loading metadata_filter file '{}'.".format(metadata_filter))
+                self.metadata_filter = ""
                 with open(metadata_filter, 'r') as fh:
-                    self.metadata_filter = fh.read()
+                    for line in fh:
+                        # check for "<enable-all-rules>" directive that enables all rules
+                        if line.lstrip().lower().startswith("<enable-all-rules>"):
+                            print_debug("Enabling all rules.")
+                            self.include_disabled_rules = True
+                            line = line[len("<enable-all-rules>"):].lstrip()
+                        # strip out comments and ignore blank lines
+                        if line.strip().startswith('#') or len(line.strip()) == 0:
+                            continue
+                        self.metadata_filter += line
             else:
                 self.metadata_filter = metadata_filter
         except Exception as e:

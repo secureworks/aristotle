@@ -1,0 +1,19 @@
+# enable all rules and then match on all rules involving the HTTP or TLS protocols,
+# where the attack target has been identified as HTTP server or TLS server.
+# The "attack target" is what you are trying to protect; usually a part of HOME_NET.
+
+# this enables all rules, including disabled ones, before
+# applying the Boolean filter
+<enable-all-rules>
+
+(
+    (
+        "protocols http"
+    OR
+        "protocols tls"
+    )
+  AND
+    (
+        "attack_target http-server" OR "attack_target tls-server"
+    )
+)
