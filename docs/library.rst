@@ -32,5 +32,5 @@ Example:
 ``Ruleset`` class and functions:
 
 .. autoclass:: aristotle.Ruleset
-   :members: get_stats, set_metadata_filter, filter_ruleset, output_rules, get_all_sids, print_header, get_stats, print_stats, print_ruleset_summary
+   :members: get_stats, set_metadata_filter, filter_ruleset, output_rules, get_all_sids, print_header, print_stats, print_ruleset_summary
 
