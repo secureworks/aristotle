@@ -5,7 +5,7 @@ Aristotle
 Aristotle is a simple Python program that allows for the filtering of
 Suricata and Snort rulesets based on interpreted key-value pairs present
 in the metadata keyword within each rule. It can be run as a standalone
-script or utilized as a library.
+script or utilized as a module.
 
 Documentation
 =============
@@ -35,11 +35,11 @@ Install dependencies:
 
 ``pip install -r requirements.txt``
 
-Or if using as a library:
+Or if using as a module:
 
 ``pip install aristotle``
 
-And refer to `Aristotle as a Library <https://aristotle-py.readthedocs.io/en/latest/library.html>`__.
+And refer to `Aristotle as a Module <https://aristotle-py.readthedocs.io/en/latest/module.html>`__.
 
 Usage
 =====
