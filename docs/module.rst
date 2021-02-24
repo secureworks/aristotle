@@ -1,7 +1,12 @@
-Aristotle as a Library
-======================
+Aristotle as a Module
+=====================
 
-Aristotle can be imported and used like a normal library:
+If the module is installed, Aristotle can be invoked from the command
+line and run like a script, e.g.:
+
+``python3 -m aristotle -r examples/example.rules --stats``
+
+Of course, Aristotle can be imported and used like a normal module:
 
 ``import aristotle``
 
