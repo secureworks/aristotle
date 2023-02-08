@@ -26,9 +26,9 @@ copyright = u'2019, Secureworks'
 author = u'David Wharton'
 
 # The short X.Y version
-version = u'1.0'
+version = u'1.1'
 # The full version, including alpha/beta/rc tags
-release = u'1.0.2'
+release = u'1.1.0'
 
 
 # -- General configuration ---------------------------------------------------

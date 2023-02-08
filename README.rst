@@ -47,7 +47,7 @@ Usage
 .. code:: text
 
   usage: aristotle.py [-h] -r RULES [-f METADATA_FILTER] [--summary]
-                      [-o OUTFILE] [-s [STATS [STATS ...]]] [-i] [-q] [-d]
+                      [-o OUTFILE] [-s [STATS [STATS ...]]] [-i] [-t] [-q] [-d]
 
   optional arguments:
     -h, --help            show this help message and exit
@@ -70,6 +70,9 @@ Usage
     -i, --include-disabled
                           include (effectively enable) disabled rules when
                           applying the filter (default: False)
+    -t, --ignore-classtype, --ignore-classtype-keyword
+                          don't appropriate the 'classtype' keyword and value from the rule into the metadata structure
+                          for filtering and reporting (default: False)
     -q, --quiet, --suppress_warnings
                           quiet; suppress warning logging (default: False)
     -d, --debug           turn on debug logging (default: False)

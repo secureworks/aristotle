@@ -50,6 +50,7 @@ if (sys.version_info < (3, 2)):
 disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B")
 sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
 metadata_keyword_re = re.compile(r"[\x28\x3B]\s*metadata\s*\x3A\s*(?P<METADATA>[^\x3B]+)\x3B")
+classtype_keyword_re = re.compile(r"[\x28\x3B]\s*classtype\s*\x3A\s*(?P<CLASSTYPE>[^\x3B]+)\x3B")
 rule_msg_re = re.compile(r"[\s\x3B\x28]msg\s*\x3A\s*\x22(?P<MSG>[^\x22]+?)\x22\s*\x3B")
 
 if os.isatty(0) and sys.stdout.isatty():
@@ -85,7 +86,7 @@ def print_error(msg, fatal=True):
     :param msg: error message
     :type msg: string, required
     :param fatal: also log to logging.critical and raise an Exception (or exit if running as a stand-alone script), defaults to `True`.
-    :type fatal: boolean, optional
+    :type fatal: bool, optional
     :raises: `AristotleException`
     """
     aristotle_logger.error(INVERSE + RED + "ERROR:" + RESET + RED + " {}".format(msg) + RESET)
@@ -115,12 +116,15 @@ class Ruleset():
         Boolean algebra. Defaults to None (can be set later with ``set_metadata_filter()``).
     :type metadata_filter: string, optional
     :param include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
-    :type include_disabled_rules: boolean
+    :type include_disabled_rules: bool, optional
     :param summary_max: the maximum number of rules to print when outputting summary/truncated filtered ruleset, defaults to `16`.
     :type summary_max: int, optional
+    :param ignore_classtype_keyword: don't appropriate the 'classtype' keyword and value into the
+        metadata structure for filtering and reporting
+    :type ignore_classtype_keyword: bool, optional
     :raises: `AristotleException`
     """
-    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False, summary_max=16):
+    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False, summary_max=16, ignore_classtype_keyword=False):
         """Constructor."""
 
         # dict keys are sids
@@ -143,7 +147,7 @@ class Ruleset():
             print_error("Unable to process rules '{}':\n{}".format(rules, e), fatal=True)
 
         self.include_disabled_rules = include_disabled_rules
-
+        self.ignore_classtype_keyword = ignore_classtype_keyword
         if not metadata_filter:
             self.metadata_filter = None
             print_debug("No metadata_filter given to Ruleset() constructor")
@@ -209,6 +213,15 @@ class Ruleset():
                     print_error("Invalid rule on line {}:\n{}".format(lineno, line), fatal=True)
                 sid = int(matchobj.group("SID"))
 
+                # extract classtype. This only grabs the first one; some engines support multiple
+                # 'classtype' keywords in rules but it practice it is rarely, if ever, done.
+                classtype = None
+                matchobj = classtype_keyword_re.search(line)
+                if matchobj:
+                    classtype = matchobj.group("CLASSTYPE")
+                else:
+                    print_debug("No 'classtype' keyword found in sid {}".format(sid))
+
                 # extract metadata keyword value
                 metadata_str = ""
                 matchobj = metadata_keyword_re.search(line)
@@ -228,6 +241,12 @@ class Ruleset():
                 if is_disabled_rule:
                     self.metadata_dict[sid]['disabled'] = True
                     self.metadata_dict[sid]['default-disabled'] = True
+
+                if classtype and not self.ignore_classtype_keyword:
+                    # add classtype from keyword as pseudo metadata key
+                    metadata_str += "{}classtype {}".format(
+                        ", " if len(metadata_str) > 0 else "",
+                        classtype)
 
                 if len(metadata_str) > 0:
                     for kvpair in metadata_str.split(','):
@@ -252,7 +271,7 @@ class Ruleset():
                         if v not in self.keys_dict[k].keys():
                             self.keys_dict[k][v] = []
                         self.keys_dict[k][v].append(sid)
-                # add sid as pseudo metadata key unless it already exist
+                # add sid as pseudo metadata key unless it already exists
                 if 'sid' not in self.metadata_dict[sid]['metadata'].keys():
                     # keys and values are strings; variable "sid" is int so must
                     # be cast as str when used the same way other keys and values are used.
@@ -334,7 +353,7 @@ class Ruleset():
         :param kvpair: key-value pair
         :type kvpair: string, required
         :param negate: returns the inverse of the result (i.e. all SIDs not matching the ``kvpair``), defaults to `False`
-        :type negate: boolean, optional
+        :type negate: bool, optional
         :returns: list of matching SIDs
         :rtype: list
         :raises: `AristotleException`
@@ -522,7 +541,7 @@ class Ruleset():
         :param key: key to print statistics for
         :type key: string, required
         :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
-        :type keyonly: boolean, optional
+        :type keyonly: bool, optional
         :returns: string contaning stats, suitable for printing to stdout
         :rtype: string
         :raises: `AristotleException`
@@ -554,7 +573,7 @@ class Ruleset():
         :param key: key to print statistics for
         :type key: string, required
         :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
-        :type keyonly: boolean, optional
+        :type keyonly: bool, optional
         """
         stats_str = self.get_stats(key=key, keyonly=keyonly)
         if stats_str[-1] == '\n':
@@ -666,6 +685,12 @@ OR "protocols pop" OR "protocols imap") OR "sid 80181444"'
                             required=False,
                             default=False,
                             help="include (effectively enable) disabled rules when applying the filter")
+        parser.add_argument("-t", "--ignore-classtype", "--ignore-classtype-keyword",
+                            action="store_true",
+                            dest="ignore_classtype_keyword",
+                            required=False,
+                            default=False,
+                            help="don't appropriate the 'classtype' keyword and value from the rule into the metadata structure for filtering and reporting")
         parser.add_argument("-q", "--quiet", "--suppress_warnings",
                             action="store_true",
                             dest="suppress_warnings",
@@ -712,7 +737,7 @@ def main():
     if args.stats is not None:
         keys = []
         keyonly = False
-        rs = Ruleset(rules=args.rules)
+        rs = Ruleset(rules=args.rules, ignore_classtype_keyword=args.ignore_classtype_keyword)
         rs.print_header()
         if len(args.stats) > 0:
             # print stats for specified key(s)
@@ -730,7 +755,8 @@ def main():
 
     # create object
     rs = Ruleset(rules=args.rules, metadata_filter=args.metadata_filter,
-                 include_disabled_rules=args.include_disabled_rules)
+                 include_disabled_rules=args.include_disabled_rules,
+                 ignore_classtype_keyword=args.ignore_classtype_keyword)
 
     filtered_sids = rs.filter_ruleset()
 

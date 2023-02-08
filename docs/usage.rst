@@ -4,7 +4,7 @@ Usage
 .. code:: text
 
   usage: aristotle.py [-h] -r RULES [-f METADATA_FILTER] [--summary]
-                      [-o OUTFILE] [-s [STATS [STATS ...]]] [-i] [-q] [-d]
+                      [-o OUTFILE] [-s [STATS [STATS ...]]] [-i] [-t] [-q] [-d]
 
   optional arguments:
     -h, --help            show this help message and exit
@@ -27,6 +27,10 @@ Usage
     -i, --include-disabled
                           include (effectively enable) disabled rules when
                           applying the filter (default: False)
+    -t, --ignore-classtype, --ignore-classtype-keyword
+                          don't appropriate the 'classtype' keyword and value
+                          from the rule into the metadata structure for
+                          filtering and reporting
     -q, --quiet, --suppress_warnings
                           quiet; suppress warning logging (default: False)
     -d, --debug           turn on debug logging (default: False)
@@ -171,3 +175,15 @@ keys:
       tftp (Total: 1; Enabled: 0; Disabled: 1)
       ssh (Total: 9; Enabled: 4; Disabled: 5)
 
+Classtype
+---------
+
+Suricata and Snort support the ``classtype`` keyword and many rulesets choose to utilize this rule keyword
+instead of putting the ``classtype`` key-value pair into the metadata.  Therefore, by default, Aristotle
+will take the ``classtype`` value from the rule keyword and add a ``classtype`` metadata key and value into the
+(internal data structures representing the) metadata so that it can be used for filtering and statistics generation.
+If multiple ``classtype`` keywords are used in a rule, only the first one seen (from left-to-right) will be
+incorporated.  The ``classtype`` keyword can be used in a rule and defined in the metadata without issue; only
+the unique values will be considered.
+This default behavior can be changed with a command line switch or in
+the :ref:`Ruleset class constructor <target Ruleset class>`.
