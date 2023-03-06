@@ -16,7 +16,7 @@ rules:
       )
     actions:
       - add_metadata_exclusive: "risk_score 10"
-      - set_priority: 2
+      - set_priority: 3
   - name: ip-rules-outbound
     filter_string: >-
       (
@@ -27,7 +27,7 @@ rules:
     actions:
       - add_metadata_exclusive: "risk_score 51"
       - add_metadata: "soc_response_color brown"
-      - set_priority: 3
+      - set_priority: 2
   - name: drop-inbound-dns-requests
     filter_string: >-
       (
