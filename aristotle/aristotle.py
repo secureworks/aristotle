@@ -4,7 +4,8 @@
 Command line tool and library for filtering Suricata
 and Snort rulesets based on metadata keyword values.
 """
-# Copyright 2019 Secureworks
+# Copyright 2019 Secureworks, Inc.
+# Copyright 2023 Uber Technologies, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,11 +23,14 @@ import argparse
 import boolean
 import datetime
 from dateutil.parser import parse as dateparse
+import glob
 import hashlib
 import logging
 import os
 import re
 import sys
+import traceback
+import yaml
 
 class AristotleException(Exception):
     pass
@@ -47,10 +51,22 @@ aristotle_logger = logging.getLogger("aristotle")
 if (sys.version_info < (3, 2)):
     aristotle_logger.addHandler(logging.NullHandler())
 
-disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B")
+rule_re = re.compile(r"^(?P<HEADER>(?P<ACTION>pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+(?P<PROTO>[^\s]+)\s+(?P<SRCIP>[^\s]+)\s+(?P<SRCPORT>[^\s]+)\s+(?P<DIRECTION>[\x2D\x3C]\x3E)\s+(?P<DSTIP>[^\s]+)\s+(?P<DSTPORT>[^\s]+))\s+\x28(?P<BODY>[^\x29]+)")
+disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B")
 sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
-metadata_keyword_re = re.compile(r"[\x28\x3B]\s*metadata\s*\x3A\s*(?P<METADATA>[^\x3B]+)\x3B")
+metadata_keyword_re = re.compile(r"(?P<PRE>[\x28\x3B]\s*metadata\s*\x3A\s*)(?P<METADATA>[^\x3B]+)\x3B")
+classtype_keyword_re = re.compile(r"[\x28\x3B]\s*classtype\s*\x3A\s*(?P<CLASSTYPE>[^\x3B]+)\x3B")
+priority_keyword_re = re.compile(r"(?P<PRE>[\x28\x3B]\s*priority\s*\x3A\s*)(?P<PRIORITY>[^\x3B]+)\x3B")
+flow_re = re.compile(r"[\s\x3B\x28]flow\s*\x3A\s*(?P<FLOW>[^\x3B]+?)\x3B")
+app_layer_protocol_re = re.compile(r"[\s\x3B\x28]app-layer-protocol\s*\x3A\s*(?P<ALPROTO>[^\x3B]+?)\x3B")
+target_keyword_re = re.compile(r"[\x28\x3B]\s*target\s*\x3A\s*(?P<TARGET>[^\x3B]+)\x3B")
 rule_msg_re = re.compile(r"[\s\x3B\x28]msg\s*\x3A\s*\x22(?P<MSG>[^\x22]+?)\x22\s*\x3B")
+cve_re = re.compile(r"(?:19|20)\d{2}\x2D(?:0\d{3}|[1-9]\d{3,})")
+cve_re_broad = re.compile(r"\bcve\x2D\d{4}\x2D\d+\b",flags=re.I)
+mitre_attack_url_re = re.compile(r"attack\x2Emitre\x2Eorg\x2F(?:techniques|datasources|groups|software|campaigns)\x2F(?:TA|DS|[TGSC])\d+(?:\x2F\d+)?")
+eol_re = re.compile(r"\x29\s*$")
+
+ipval_cache = {}
 
 if os.isatty(0) and sys.stdout.isatty():
     # ANSI colors; see https://en.wikipedia.org/wiki/ANSI_escape_code
@@ -85,7 +101,7 @@ def print_error(msg, fatal=True):
     :param msg: error message
     :type msg: string, required
     :param fatal: also log to logging.critical and raise an Exception (or exit if running as a stand-alone script), defaults to `True`.
-    :type fatal: boolean, optional
+    :type fatal: bool, optional
     :raises: `AristotleException`
     """
     aristotle_logger.error(INVERSE + RED + "ERROR:" + RESET + RED + " {}".format(msg) + RESET)
@@ -115,14 +131,27 @@ class Ruleset():
         Boolean algebra. Defaults to None (can be set later with ``set_metadata_filter()``).
     :type metadata_filter: string, optional
     :param include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
-    :type include_disabled_rules: boolean
+    :type include_disabled_rules: bool, optional
     :param summary_max: the maximum number of rules to print when outputting summary/truncated filtered ruleset, defaults to `16`.
     :type summary_max: int, optional
+    :param ignore_classtype_keyword: don't incorporate the 'classtype' keyword and value into the
+        metadata structure for filtering and reporting
+    :type ignore_classtype_keyword: bool, optional
+    :param ignore_filename: don't incorporate the filename of the rules file into the metadata structure for filtering and reporting
+    :type ignore_filename: bool, optional
+    :param normalize: try to convert and normalize date and CVE related metadata values into the schema defined by BETTER.
+        Dates are normalized to the format YYYY-MM-DD and CVEs to YYYY-<num>.  Also, 'sid' is removed from the metadata.
+    :type normalize: bool, optional
+    :param enhance: enhance metadata by adding additional key-value pairs based on the rules
+    :type enhance: bool, optional
+    :param modify_metadata: modify the rule metadata keyword value on output to contain the internally tracked and normalized metadata data.
+    :type modify_metadata: bool, optional
+    :param pfmod_file: A filename of a YAML file of directives to apply actions on post-filtered rules based on filter strings.
+    :type pfmod_file: string, optional
     :raises: `AristotleException`
     """
-    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False, summary_max=16):
+    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False, summary_max=16, ignore_classtype_keyword=False, ignore_filename=False, normalize=False, enhance=False, modify_metadata=False, pfmod_file=None):
         """Constructor."""
-
         # dict keys are sids
         self.metadata_dict = {}
         # dict keys are keys from metadata key-value pairs
@@ -130,20 +159,16 @@ class Ruleset():
         # dict keys are hash of key-value pairs from passed in filter string/file
         self.metadata_map = {}
 
-        try:
-            if os.path.isfile(rules):
-                with open(rules, 'r') as fh:
-                    self.rules = fh.read()
-            else:
-                if len(rules) < 256 and "metadata" not in rules:
-                    # probably a mis-typed filename
-                    print_error("'{}' is not a valid file and does not appear to be a string containing valid rule(s)".format(rules), fatal=True)
-                self.rules = rules
-        except Exception as e:
-            print_error("Unable to process rules '{}':\n{}".format(rules, e), fatal=True)
-
         self.include_disabled_rules = include_disabled_rules
-
+        self.ignore_classtype_keyword = ignore_classtype_keyword
+        self.ignore_filename = ignore_filename
+        self.normalize = normalize
+        self.enhance = enhance
+        self.modify_metadata = modify_metadata
+        self.pfmod_file = pfmod_file
+        if pfmod_file and not modify_metadata:
+            print_warning("'pfmod_file' specified but 'modify_metadata' not enabled.  Enabling 'modify_metadata'....")
+            self.modify_metadata = True
         if not metadata_filter:
             self.metadata_filter = None
             print_debug("No metadata_filter given to Ruleset() constructor")
@@ -154,7 +179,44 @@ class Ruleset():
             self.summary_max = int(summary_max)
         except Exception as e:
             print_error("Unable to process 'summary_max' value '{}' passed to Ruleset constructor:\n{}".format(summary_max, e))
-        self.parse_rules()
+
+        if self.pfmod_file:
+            try:
+                if not os.path.isfile(self.pfmod_file):
+                    print_error("'{}': file not found.".format(self.pfmod_file), fatal=True)
+                with open(self.pfmod_file, 'r') as fh:
+                    self.pfmod_rules = yaml.safe_load(fh)
+            except Exception as e:
+                print_error("Unable to open YAML file '{}': {}".format(self.pfmod_file, e), fatal=True)
+            # YAML loaded, will process later and validate then
+        # deal with rules file(s)
+        try:
+            if os.path.isfile(rules):
+                with open(rules, 'r') as fh:
+                    self.parse_rules(rules=fh.read(), filename=os.path.basename(rules))
+            elif os.path.isdir(rules):
+                # process all files ending with ".rules"; sort (alphabetically) and process in order
+                rules_files = sorted(glob.glob(os.path.join(rules, "*.rules")))
+                if len(rules_files) == 0:
+                    print_error("No '.rules' files found in directory '{}'.".format(rules), fatal=True)
+                for file in rules_files:
+                    if os.path.isfile(file):
+                        with open(file, 'r') as fh:
+                            self.parse_rules(rules=fh.read(), filename=os.path.basename(file))
+                    else:
+                        print_debug("File '{}' not a file! Skipping.".format(file))
+            else:
+                if len(rules) < 256 and "metadata" not in rules:
+                    # probably a mis-typed filename
+                    print_error("'{}' is not a valid file or directory, and does not appear to be a string containing valid rule(s)".format(rules), fatal=True)
+                self.parse_rules(rules)
+
+            if self.enhance:
+                self._enhance_metadata()
+            print_debug("Total cache size: {}".format(len(ipval_cache.keys())))
+        except Exception as e:
+            traceback.print_exc(e)
+            print_error("Unable to process rules '{}':\n{}".format(rules, e), fatal=True)
 
     def set_metadata_filter(self, metadata_filter):
         """Sets the metadata filter to use.
@@ -186,11 +248,371 @@ class Ruleset():
         except Exception as e:
             print_error("Unable to process metadata_filter '{}':\n{}".format(metadata_filter, e), fatal=True)
 
+    def reduce_ipval(self, ipval):
+        """ Take an "IP" value (raw IP, list, ipvar) and reduce it to one of the following:
+                - any
+                - $HOME_NET
+                - $EXTERNAL_NET
+                - UNDETERMINED
 
-    def parse_rules(self):
-        """Parses the ruleset and builds necessary data structures."""
+            Assumptions:
+                - ipval doesn't contain any nested lists
+                    - (could recurse on nested lists but once we start reducing, we loose accuraccy pretty fast.)
+                    - (most 3rd party rulesets should rarely, if ever, need to include rules that require nested IPs/ranges.)
+
+            :param ipval: IP part of a rule, e.g. $HOME_NET, 10.0.0.0/8, [192.168.1.0/24,192.168.2.0/24], etc.
+            :type ipval: string, required
+            :returns: 'any', '$HOME_NET', '$EXTERNAL_NET', or 'UNDETERMINED'
+            :rtype: string
+        """
+        global ipval_cache
+        unknown = "UNDETERMINED"
+        return_values = ["any", "$HOME_NET", "$EXTERNAL_NET", "UNDETERMINED"]
+        if ipval in return_values:
+            return ipval
+        if len(ipval) < 2:
+            print_error("Bad IPVAR found: {}".format(ipval))
+            return unknown
+        # check cache. Testing shows using a cache doesn't speed things up....
+        cached_val = ipval_cache.get(ipval)
+        if cached_val:
+            return ipval_cache[ipval]
+        original_val = ipval
+        negated = False
+        if ipval[0] == '!':
+            negated = True
+            ipval = ipval[1:]
+        if ipval[0] == '[':
+            ipval = ipval[1:-1]
+        brackets = [c for c in ipval if c == '[']
+        if len(brackets) > 0:
+            print_error("Double nested ipval found: {}.  Cannot reduce".format(original_ipval))
+            return unknown
+        ipval_list = [v.strip() for v in ipval.split(',')]
+        reduced_ipval = self._reduce_ipval_helper(ipval_list, global_negate=negated)
+        #print_debug(" Original: {}\nProcessed: {}\n  Reduced: {}\n".format(original_val, ipval, reduced_ipval))
+        ipval_cache[original_val] = reduced_ipval
+        return reduced_ipval
+
+    def _reduce_ipval_helper(self, vals, global_negate=False):
+        """ Take in list of IPVAR values and reduce to 'any', '$HOME_NET",
+            '$EXTERNAL_NET", or 'UNKNOWN'.
+            Assumption: no overlap in home_net and external_net vars.
+
+            :param vals: list of IPVAR values
+            :type vals: list, required
+            :param global_negate: invert response
+            :type global_negate: bool, optional
+        """
+        home_net_vars = ["$HOME_NET", "$DNS_SERVERS", "$HTTP_SERVERS", "$SMTP_SERVERS", "$SQL_SERVERS",
+                 "$TELNET_SERVERS", "$FTP_SERVERS", "$DNP3_CLIENT", "$DNP3_SERVER", "$ICCP_CLIENT",
+                 "$ICCP_SERVER", "$ENIP_CLIENT", "$ENIP_SERVER", "$MODBUS_CLIENT", "$MODBUS_SERVER"]
+        external_net_vars = ["$EXTERNAL_NET", "$RFC1918", "$GOTOMYPC", "$AIM_SERVERS"]
+        # add CGNAT?
+        known_localnet_ips = ["10.0.0.0/8", "192.168.0.0/24", "172.16.0.0/12", "127.0.0.0/8", "255.255.255.255"]
+        unknown = "UNDETERMINED"
+        rfc1918_found = False
+        if 'any' in vals:
+            return 'any'
+        for v in vals:
+            negated = global_negate
+            if v[0] == '!':
+                negated = not global_negate
+                v = v[1:]
+            # Assume variable ending in "_SERVERS" is HOME_NET unless already listed as in EXTERNAL_NET
+            if v not in external_net_vars and v not in home_net_vars and v.endswith("_NET"):
+                home_net_vars.append(v)
+            if not negated:
+                if v in home_net_vars:
+                    return "$HOME_NET"
+                if v in external_net_vars:
+                    return "$EXTERNAL_NET"
+            else:
+                if v in home_net_vars:
+                    return "$EXTERNAL_NET"
+                if v in external_net_vars:
+                    return "$HOME_NET"
+            if v.startswith('$'):
+                print_error("Unclassified variable found in _reduce_ipval_helper(): '{}'".format(v))
+                return unknown
+            # this *should* be an IP or CIDR block
+            if v in known_localnet_ips and not negated:
+                rfc1918_found = True
+        # at this point we *should* be left with a list of IPs.  Assume these are EXTERNAL_NET,
+        # even if negated, unless explicit RFC1918 has been seen.
+        if rfc1918_found:
+            return "$HOME_NET"
+        else:
+            return "$EXTERNAL_NET"
+        # never reached
+        return unknown
+
+    def _enhance_metadata(self):
+        """ Enhance metadata on all the rules by adding additional key-value pairs based on the rule.
+            Specifically:
+                - 'flow' key-value pair
+                - 'detection direction' key-value pair
+                - CVE values found in rule (typically msg or references)
+                - MITRE ATT&CK found in rule (typically extracted from references)
+        """
+        for sid in self.metadata_dict.keys():
+            rule = self.metadata_dict[sid]['raw_rule']
+
+            rule_match_obj = rule_re.match(rule)
+            if not rule_match_obj:
+                print_error("Invalid rule: '{}'".format(rule), fatal=True)
+
+            # find CVE references (often in msg or reference) and add as metadata
+            cves = cve_re_broad.findall(rule)
+            if cves:
+                for cve in cves:
+                    self.add_metadata(sid, "cve", cve[4:])
+
+            # find MITRE ATT&CK URL references, extract the values, and add as metadata
+            mitres = mitre_attack_url_re.findall(rule)
+            if mitres:
+                for mitre in mitres:
+                    val = mitre.split('/', 2)[-1].replace('/', '.')
+                    self.add_metadata(sid, "mitre_attack", val)
+
+            # find 'target' keyword and convert to 'hostile' BETTER key-value
+            target_match_obj = target_keyword_re.search(rule)
+            if target_match_obj:
+                target = target_match_obj.group("TARGET")
+                if target == "src_ip":
+                    self.add_metadata(sid, "hostile", "dest_ip")
+                elif target == "dest_ip":
+                    self.add_metadata(sid, "hostile", "src_ip")
+                else:
+                    # shouldn't happen b/c Suricata will error on the rule on load
+                    print_error("Keyword 'target' found in rule but with invalid value '{}'.".format(target))
+
+            # get rule direction arrow ("->" or "<>")
+            direction_arrow = rule_match_obj.group("DIRECTION")
+
+            # get set of keywords (and modifiers, technically)
+            keywords = rule_match_obj.group("BODY")
+            keywords = list(set([k.split(':')[0].strip() for k in keywords.split(';') if len(k.strip()) > 1]))
+
+            # get/add protocols
+            proto = rule_match_obj.group("PROTO").lower().strip()
+            self.add_metadata(sid, 'protocols', proto)
+            match_obj = app_layer_protocol_re.search(rule)
+            if match_obj:
+                proto = match_obj.group("ALPROTO").lower().strip()
+                if not proto.startswith('!') and proto != "failed":
+                    self.add_metadata(sid, "protocols", proto)
+            # check keywords known to be associated with particular protocols
+            known_protocols = ['http', 'dns', 'tls', 'ssh', 'snmp', 'sip', 'rfb', 'mqtt', 'http2',
+                               'ja3', 'dnp3', 'cip', 'enip', 'ftpdata', 'krb5', ]
+            for app_proto in known_protocols:
+                htest = [k for k in keywords if k.startswith("{}_".format(app_proto)) or k.startswith("{}.".format(app_proto))]
+                if len(htest) > 0:
+                    if app_proto == "ja3":
+                        app_proto = "tls"
+                    elif app_proto == "cip":
+                        app_proto = "enip"
+                    elif app_proto == "ftpdata":
+                        app_proto = "ftp"
+                    elif app_proto == "krb5":
+                        app_proto = "kerberos"
+                    self.add_metadata(sid, 'protocols', app_proto)
+
+            # get flow
+            match_obj = flow_re.search(rule)
+            if match_obj:
+                # normalize so direction is "to_client" or "to_server"
+                flow_str = match_obj.group("FLOW").lower().replace("from_server", "to_client").replace("from_client", "to_sever")
+                flows = [f.strip() for f in flow_str.split(',')]
+                direction_found = False
+                for v in flows:
+                    self.add_metadata(sid, 'flow', v)
+                    if v.startswith("to_"):
+                        direction_found = True
+                if not direction_found:
+                    # check keywords that force direction (request or response)
+                    # This hits the most common ones; further checking could be done
+                    # e.g. mqtt keywords.
+                    request_keywords = ["http.uri", "http_uri", "http.uri.raw", "http_raw_uri",
+                                        "http.method", "http_method", "http.request_line",
+                                        "http_request_line", "http.request_body", "http_client_body",
+                                        "http.user_agent", "http_user_agent", "http.host", "http_host",
+                                        "http.host.raw", "http_raw_host", "http.accept", "http_accept",
+                                        "http.accept_lang", "http_accept_lang", "http.accept_enc",
+                                        "http_accept_enc", "http.referer", "http_referer", "http.connection",
+                                        "http_connection", "dns.query", "dns_query", "ssh.hassh.string",
+                                        "ja3.hash", "ja3.string", "ftpdata_command", "krb5_cname",
+                                        "sip.method", "sip.uri", "sip.request_line"]
+                    response_keywords = ["http.stat_msg", "http_stat_msg", "http.stat_code", "http_stat_code",
+                                          "http.response_line", "http_response_line", "http.response_body",
+                                          "http_server_body", "http.server", "http.location", "ssh.hassh.server",
+                                          "ssh.hassh.server.string", "ja3s.hash", "ja3s.string", "krb5_sname",
+                                          "sip.stat_code", "sip.stat_msg", "sip.response_line"]
+                    matches = [k for k in keywords if k in request_keywords]
+                    if len(matches) > 0:
+                        self.add_metadata(sid, 'flow', 'to_server')
+                    else:
+                        matches = [k for k in keywords if k in response_keywords]
+                        if len(matches) > 0:
+                            self.add_metadata(sid, 'flow', 'to_client')
+                        else:
+                            print_debug("Flow direction could not be determined from 'flow' keyword for sid '{}'.".format(sid))
+            else:
+                print_debug("No 'flow' keyword found for SID '{}'.".format(sid))
+
+            # calculate direction
+            sip_val = rule_match_obj.group("SRCIP")
+            dip_val = rule_match_obj.group("DSTIP")
+            sip_reduced = self.reduce_ipval(sip_val)
+            dip_reduced = self.reduce_ipval(dip_val)
+
+            #print_debug("{}\n{}\n".format(sip_val, sip_reduced))
+            #print_debug("{}\n{}\n".format(dip_val, dip_reduced))
+
+            #self.metadata_dict[sid]['sip_reduced'] = sip_reduced
+            #self.metadata_dict[sid]['dip_reduced'] = dip_reduced
+
+            # calculate detection direction; possible values:
+            # inbound, inbound-notexclusive, outbound, outbound-notexclusive,
+            # internal, any, both, unknown
+            if direction_arrow == "<>":
+                detection_direction = "both"
+            elif sip_reduced == "any" and dip_reduced == "$HOME_NET":
+                detection_direction = "inbound-notexclusive"
+            elif sip_reduced == "$HOME_NET" and dip_reduced == "$EXTERNAL_NET":
+                detection_direction = "outbound"
+            elif sip_reduced == "$HOME_NET" and dip_reduced == "any":
+                detection_direction = "outbound-notexclusive"
+            elif sip_reduced == "$HOME_NET" and dip_reduced == "$HOME_NET":
+                detection_direction = "internal"
+            # $EXTERNAL_NET -> $EXTERNAL_NET only going to be seen in spoofed traffic (not TCP); set it to OUTBOUND
+            elif dip_reduced == "$EXTERNAL_NET":
+                detection_direction = "outbound"
+            elif sip_reduced == "$EXTERNAL_NET":
+                detection_direction = "inbound"
+            elif sip_reduced == "any" and dip_reduced == "any":
+                detection_direction = "any"
+            else:
+                detection_direction = "unknown"
+            self.add_metadata(sid, 'detection_direction', detection_direction)
+
+            #
+        # TODO: remove duplicates?
+        return
+
+    def normalize_better(self, k, v):
+        """ Try to convert date and cve related metadata values to conform to the
+            BETTER schema for filtering and statistics. Currently applies to keys,
+            'cve' and those ending with '_at' or "-at".
+
+            :param k: key name of a metadata key-value pair
+            :type k: string, required
+            :param v: value of a metadata key-value pair
+            :type v: string, required
+
+            :returns: list of all key/value pairs to add to metadata structure
+            :rtype: list
+        """
+        retlist = []
+        if k.endswith("_at") or k.endswith("-at"):
+            # treat as possible date
+            try:
+                v = dateparse(v.replace('_', '-'))
+                v = v.strftime("%Y-%m-%d")
+            except Exception as e:
+                print_warning("Unable to parse '{}' key with value '{}' as date.".format(k, v))
+            retlist.append([k, v])
+        elif k == "cve":
+            # ET ruleset will in some cases string together multiple CVEs in one
+            # string, e.g. "cve_2021_27561_cve_2021_27562" so deal with that and
+            # the other underscore nonsense.
+            cves = cve_re.findall(v.replace('_', '-'))
+            if len(cves) == 0:
+                print_warning("Unable to parse '{}' value '{}'".format(k, v))
+            for cve in cves:
+                retlist.append([k, cve])
+        else:
+            retlist.append([k, v])
+        return retlist
+
+    def add_metadata(self, sid, key, value):
+        """ Update self.metadata_dict and self.keys_dict data structures for the
+            given sid, adding the passed in key and value.
+
+            :param sid: sid to update
+            :type sid: int, required
+            :param key: key to add or update
+            :type key: string, required
+            :param value: value corresponding to given key
+            :type value: string, required
+        """
+        # key-value pairs are case insensitive; make everything lower case (needed for accurate matching
+        # in filters) and strip leading and trailing whitespace.
+        key = key.lower().strip()
+        value = value.lower().strip()
+        if not sid in self.metadata_dict.keys():
+            print_error("add_metadata() called for sid '{}' but sid is invalid (does not exist).".format(sid))
+            return
+        # populate metadata_dict
+        if key not in self.metadata_dict[sid]['metadata'].keys():
+            self.metadata_dict[sid]['metadata'][key] = []
+        if value not in self.metadata_dict[sid]['metadata'][key]:
+            self.metadata_dict[sid]['metadata'][key].append(value)
+        # populate keys_dict
+        if key not in self.keys_dict.keys():
+            self.keys_dict[key] = {}
+        if value not in self.keys_dict[key].keys():
+            self.keys_dict[key][value] = []
+        if sid not in self.keys_dict[key][value]:
+            self.keys_dict[key][value].append(sid)
+
+    def delete_metadata(self, sid, key, value=None):
+        """ Update self.metadata_dict and self.keys_dict data structures for the
+            given sid, deleting the passed in key and value.  If value is not
+            provided (or None), delete all references involving the given key.
+
+            :param sid: sid to update
+            :type sid: int, required
+            :param key: key to add or update
+            :type key: string, required
+            :param value: value corresponding to given key
+            :type value: string, optional
+        """
+        key = key.lower().strip()
+        if value:
+            value = value.lower().strip()
+        if not sid in self.metadata_dict.keys():
+            print_error("delete_metadata() called for sid '{}' but sid is invalid (does not exist).".format(sid))
+            return
+        if value is None:
+            if key in self.metadata_dict[sid]['metadata'].keys():
+                del self.metadata_dict[sid]['metadata'][key]
+            else:
+                print_debug("key '{}' not found in sid '{}', cannot delete.".format(key, sid))
+            if key in self.keys_dict.keys():
+                for value in self.keys_dict[key].keys():
+                    if sid in self.keys_dict[key][value]:
+                        self.keys_dict[key][value].remove(sid)
+        else:
+            if key in self.metadata_dict[sid]['metadata'].keys():
+                if value in self.metadata_dict[sid]['metadata'][key]:
+                    self.metadata_dict[sid]['metadata'][key].remove(value)
+            if key in self.keys_dict.keys():
+                if value in self.keys_dict[key].keys():
+                    if sid in self.keys_dict[key][value]:
+                        self.keys_dict[key][value].remove(sid)
+
+
+    def parse_rules(self, rules, filename=None):
+        """Parses the given rules and builds/updates necessary data structures.
+
+        :param rules: rules (one per line) to parse and build/update the necessary data structures
+        :type rules: string, required
+        :param filename: if the passed in rules came from a file, the filename of that file
+        :type filename: string, optional
+        """
         try:
-            for lineno, line in enumerate(self.rules.splitlines()):
+            for lineno, line in enumerate(rules.splitlines()):
              # ignore comments and blank lines
                 is_disabled_rule = False
                 if len(line.strip()) == 0:
@@ -198,6 +620,7 @@ class Ruleset():
                 if line.lstrip().startswith('#'):
                     if disabled_rule_re.match(line):
                         is_disabled_rule = True
+                        line = line[1:]
                     else:
                         # valid comment (not disabled rule)
                         print_debug("Skipping comment: {}".format(line))
@@ -209,6 +632,15 @@ class Ruleset():
                     print_error("Invalid rule on line {}:\n{}".format(lineno, line), fatal=True)
                 sid = int(matchobj.group("SID"))
 
+                # extract classtype. This only grabs the first one; some engines support multiple
+                # 'classtype' keywords in rules but it practice it is rarely, if ever, done.
+                classtype = None
+                matchobj = classtype_keyword_re.search(line)
+                if matchobj:
+                    classtype = matchobj.group("CLASSTYPE")
+                else:
+                    print_debug("No 'classtype' keyword found in sid {}".format(sid))
+
                 # extract metadata keyword value
                 metadata_str = ""
                 matchobj = metadata_keyword_re.search(line)
@@ -219,8 +651,21 @@ class Ruleset():
                 if (lineno % 1000 == 0):
                     print_debug("metadata_str for sid {}:\n{}".format(sid, metadata_str))
 
+                # extract 'msg' field
+                matchobj = rule_msg_re.search(line)
+                if not matchobj:
+                    print_warning("Unable to extract rule msg from SID '{}'.".format(sid))
+                    msg = ""
+                else:
+                    msg = matchobj.group("MSG")
+
                 # build dict
+                if sid in self.metadata_dict.keys():
+                    print_warning("Duplicate sid '{}' found{} Only the latest enabled one will be included.".format(sid, "!" if not filename else " in file '{}'!".format(filename)))
+                    if is_disabled_rule:
+                        continue
                 self.metadata_dict[sid] = {'metadata': {},
+                                      'msg': msg,
                                       'disabled': False,
                                       'default-disabled': False,
                                       'raw_rule': line
@@ -229,37 +674,52 @@ class Ruleset():
                     self.metadata_dict[sid]['disabled'] = True
                     self.metadata_dict[sid]['default-disabled'] = True
 
+                metadata_pairs = []
+
                 if len(metadata_str) > 0:
-                    for kvpair in metadata_str.split(','):
-                        # key-value pairs are case insensitive; make everything lower case
-                        # also remove extra spaces before, after, and between key and value
-                        kvsplit = [e.strip() for e in kvpair.lower().strip().split(' ', 1)]
-                        if len(kvsplit) < 2:
-                            # just a single word in metadata. warn and skip
-                            print_warning("Single word metadata value found, ignoring '{}' in sid {}".format(kvpair, sid))
-                            continue
-                        k, v = kvsplit
-                        if k == "sid" and int(v) != sid:
-                            # this is in violation of the BETTER schema, throw warning
-                            print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'. This may lead to unexpected results".format(lineno, v, sid))
-                        # populate metadata_dict
-                        if k not in self.metadata_dict[sid]['metadata'].keys():
-                            self.metadata_dict[sid]['metadata'][k] = []
-                        self.metadata_dict[sid]['metadata'][k].append(v)
-                        # populate keys_dict
-                        if k not in self.keys_dict.keys():
-                            self.keys_dict[k] = {}
-                        if v not in self.keys_dict[k].keys():
-                            self.keys_dict[k][v] = []
-                        self.keys_dict[k][v].append(sid)
-                # add sid as pseudo metadata key unless it already exist
+                    metadata_pairs.extend(metadata_str.split(','))
+
+                if classtype and not self.ignore_classtype_keyword:
+                    # add classtype from keyword as pseudo metadata key
+                    metadata_pairs.append("classtype {}".format(classtype))
+
+                if filename and not self.ignore_filename:
+                    metadata_pairs.append("filename {}".format(filename))
+
+                for kvpair in metadata_pairs:
+                    # key-value pairs are case insensitive; make everything lower case
+                    # also remove extra spaces before, after, and between key and value
+                    kvsplit = [e.strip() for e in kvpair.lower().strip().split(' ', 1)]
+                    if len(kvsplit) < 2:
+                        # just a single word in metadata. warn and skip
+                        print_warning("Single word metadata value found, ignoring '{}' in sid {}".format(kvpair, sid))
+                        continue
+                    k, v = kvsplit
+                    if k == "sid" and int(v) != sid:
+                        # this is in violation of the BETTER schema, throw warning
+                        print_warning("line {}: 'sid' metadata key value '{}' does not match rule sid '{}'. This may lead to unexpected results".format(lineno, v, sid))
+                    # normalize_better() returns a list b/c in rare cases it will produce more than one key/value pair.
+                    # Because of that, make everything a(nother) list, even though most of the time it will be
+                    # a one element list
+                    if self.normalize:
+                        kvs = self.normalize_better(k, v)
+                    else:
+                        kvs = [kvsplit]
+                    for current_kvp in kvs:
+                        k,v = current_kvp
+                        self.add_metadata(sid, k, v)
+                    for k in self.metadata_dict[sid]['metadata'].keys():
+                        # remove duplicate values for the same key
+                        self.metadata_dict[sid]['metadata'][k] = list(set(self.metadata_dict[sid]['metadata'][k]))
+
+                # add sid as pseudo metadata key unless it already exists
                 if 'sid' not in self.metadata_dict[sid]['metadata'].keys():
                     # keys and values are strings; variable "sid" is int so must
                     # be cast as str when used the same way other keys and values are used.
                     self.metadata_dict[sid]['metadata']['sid'] = [str(sid)]
                     self.keys_dict['sid'][str(sid)] = [sid]
-
         except Exception as e:
+            traceback.print_exc(e)
             print_error("Problem loading rules: {}".format(e), fatal=True)
 
     def cve_compare(self, left_val, right_val, cmp_operator):
@@ -334,7 +794,7 @@ class Ruleset():
         :param kvpair: key-value pair
         :type kvpair: string, required
         :param negate: returns the inverse of the result (i.e. all SIDs not matching the ``kvpair``), defaults to `False`
-        :type negate: boolean, optional
+        :type negate: bool, optional
         :returns: list of matching SIDs
         :rtype: list
         :raises: `AristotleException`
@@ -414,6 +874,30 @@ class Ruleset():
                                     (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 except Exception as e:
                     print_error("Unable to process '{}' value '{}' (as float):\n{}".format(k, v, e), fatal=True)
+        elif k in ["msg_regex", "rule_regex"]:
+            # apply regex pattern to rule msg field
+            if not (v.startswith('/') or v.endswith('.') or v.endswith("/i")):
+                print_error("Bad {} pattern '{}' in filter string. Pattern must start with '/' and end with '/' or '/i'.".format(k, v), fatal=True)
+            insensitive = False
+            re_flag = 0
+            re_v = v
+            if v.endswith('i'):
+                insensitive = True
+                re_flag = re.I
+                re_v = v[:-1]
+            re_v = re_v.strip('/')
+            try:
+                pattern_re = re.compile(r"{}".format(re_v), flags=re_flag)
+            except Exception as e:
+                print_error("Unable to compile RegEx pattern '{}': {}".format(v, e), fatal=True)
+            try:
+                if k == "msg_regex":
+                    retarray = [s for s in self.metadata_dict.keys() if pattern_re.search(self.metadata_dict[s]['msg']) and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                else:
+                    # match against raw rule
+                    retarray = [s for s in self.metadata_dict.keys() if pattern_re.search(self.metadata_dict[s]['raw_rule']) and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+            except Exception as e:
+                print_error("Problem matching RegEx pattern '{}': {}".format(v, e), fatal=True)
         else:
             if k not in self.keys_dict.keys():
                 print_warning("metadata key '{}' not found in ruleset".format(k))
@@ -478,14 +962,17 @@ class Ruleset():
             # nothing to filter on so exit
             print_error("metadata_filter string contains no tokens", fatal=True)
         for t in mytokens:
-            # key-value pairs are case insensitive; make everything lower case
-            tstrip = t.strip('"').lower()
-            # also remove extra spaces before, after, and between key and value
-            tstrip = ' '.join([e.strip() for e in tstrip.strip().split(' ', 1)])
-            print_debug(tstrip)
-            if len(tstrip.split(' ')) == 1:
+            # key-value pairs are case insensitive; make everything lower case unless key is "msg_regex" or "rule_regex"
+            tsplit = [e.strip() for e in t.strip('"').strip().split(' ', 1)]
+            tsplit[0] = tsplit[0].lower()
+            if len(tsplit) == 2:
+                if not tsplit[0] in ["msg_regex", "rule_regex"]:
+                    tsplit[1] = tsplit[1].lower()
+                tstrip = ' '.join(tsplit)
+            else:
                 # if just key provided (no value), match on all values
                 tstrip = "{} <all>".format(tstrip)
+            print_debug(tstrip)
             # if token begins with digit, the tokenizer doesn't like it
             hashstr = "D" + hashlib.md5(tstrip.encode()).hexdigest()
             # add to mapp dict
@@ -501,6 +988,125 @@ class Ruleset():
             return self.evaluate(mytree)
         except Exception as e:
             print_error("Problem processing metadata_filter string:\n\n{}\n\nError:\n{}".format(metadata_filter_original, e), fatal=True)
+
+    def _pfmod_apply(self, sids):
+        """ Applies the directives in the pfmod YAML file to passed in SIDs
+
+        :param sids: list of sids to scope to
+        :type sids: list, required
+        :returns: list of matching SIDs
+        :rtype: list
+        """
+        # TODO: support 'disable' action?
+        # TODO: call filter_ruleset() but then keep intersection of returned sids and sids passed to this function
+
+        # see docs
+        valid_actions_str = ["disable"]
+        valid_actions_dict = ["add_metadata",
+                              "add_metadata_exclusive",
+                              "delete_metadata",
+                              "set_priority",
+                              "regex_sub"
+                             ]
+        valid_actions = valid_actions_str + valid_actions_dict
+        matched_sids_all = set()
+
+        print_debug("pfmod_apply() called")
+        if "rules" not in self.pfmod_rules.keys():
+            print_error("No 'rules' directives defined in file '{}'.".format(self.pfmod_file), fatal=True)
+        if "version" in self.pfmod_rules.keys():
+            print_debug("Processing PFMod rules, version {}.".format(self.pfmod_rules['version']))
+        for rule in self.pfmod_rules['rules']:
+            rule_name = "<undefined>"
+            if "name" in rule.keys():
+                rule_name = rule['name']
+                print_debug("Processing PFMod rule '{}'".format(rule_name))
+            for k in ["filter_string", "actions"]:
+                if k not in rule.keys():
+                    print_error("No '{}' defined for PFMod rule '{}'".format(k, rule_name), fatal=True)
+            #print_debug("Filter String: {}".format(rule['filter_string']))
+            try:
+                matched_sids = self.filter_ruleset(rule['filter_string'])
+            except Exception as e:
+                print_error("Unable to apply filter string '{}' in PFMod rule named '{}'.".format(rule['filter_string'], rule_name), fatal=True)
+            #print_debug("matched_sids: {}\npassed sids: {}".format(matched_sids, sids))
+            matched_sids = list(set(sids) & set(matched_sids))
+            matched_sids_all.update(matched_sids)
+            #print_debug("Matched sids: {}".format(matched_sids))
+            print_debug("Rule:\n\t{}\n\tModified: {}".format(rule_name, len(matched_sids)))
+            for sid in matched_sids:
+                for action in rule['actions']:
+                    if type(action) == str:
+                        if action not in valid_actions_str:
+                            print_error("Invalid action '{}' in PFMod rule named '{}'. Supported str actions are: {}.".format(action, rule_name, valid_actions_str))
+                            continue
+                        if action != 'disable':
+                            print_error("Action not implemented: '{}'.".format(action))
+                            continue
+                        self.metadata_dict[sid]['disabled'] = True
+                    elif type(action) == dict:
+                        for action_key in action.keys():
+                            action_key = action_key.strip()
+                            if action_key not in valid_actions_dict:
+                                print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict))
+                                continue
+                            if len(str(action[action_key]).strip()) == 0:
+                                print_error("No value for action '{}'.".format(action_key), fatal=True)
+                            if action_key == "delete_metadata":
+                                a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
+                                if len(a) < 2:
+                                    key = a[0]
+                                    print_debug("Deleting all metadata for key '{}'.".format(key))
+                                    self.delete_metadata(sid, key)
+                                else:
+                                    key = a[0]
+                                    value = a[1]
+                                    print_debug("Deleting all metadata with key-value pair '{} {}'.".format(key, value))
+                                    self.delete_metadata(sid, key, value)
+                            elif action_key.startswith("add_metadata"):
+                                a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
+                                if len(a) != 2:
+                                    print_error("Invalid value for action '{}' in PFMod rule '{}'.".format(action_key, rule_name))
+                                else:
+                                    key = a[0]
+                                    value = a[1]
+                                    if action_key.endswith("exclusive"):
+                                        self.delete_metadata(sid, key)
+                                    self.add_metadata(sid, key, value)
+                            elif action_key == "set_priority":
+                                print_debug("Setting priority on SID {}".format(sid))
+                                priority = str(action[action_key]).strip()
+                                if priority_keyword_re.search(self.metadata_dict[sid]['raw_rule']):
+                                    self.metadata_dict[sid]['raw_rule'] = priority_keyword_re.sub(r'\g<PRE>' + priority + ';', self.metadata_dict[sid]['raw_rule'])
+                                else:
+                                    # no 'priority' keyword in original rule; add one.
+                                    priority_string = " priority:{};)".format(priority)
+                                    self.metadata_dict[sid]['raw_rule'] = eol_re.sub(priority_string, self.metadata_dict[sid]['raw_rule'])
+                            elif action_key == "regex_sub":
+                                v = action[action_key]
+                                insensitive = False
+                                re_flag = 0
+                                re_v = v
+                                if v.endswith('i'):
+                                    insensitive = True
+                                    re_flag = re.I
+                                    re_v = v[:-1]
+                                try:
+                                    search_string,replace_string = re_v.strip().strip('/').split('/')
+                                    pattern_re = re.compile(r"{}".format(search_string), flags=re_flag)
+                                    self.metadata_dict[sid]['raw_rule'] = pattern_re.sub(r'{}'.format(replace_string), self.metadata_dict[sid]['raw_rule'])
+                                except Exception as e:
+                                    print_error("Problem processing '{}' value '{}' in PFMod rule named '{}': {}".format(action_key, v, rule_name, e))
+                                    continue
+
+                            else:
+                                #not reached
+                                print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict), fatal=True)
+                            #print_debug("Handled '{}' Action: '{}'. Value: '{}'".format(action_key, action, action[action_key]))
+                    else:
+                        print_error("Invalid action data type '{}' in PFMod rule named '{}'.".format(type(action), rule_name))
+                        continue
+        return matched_sids_all
 
     def print_header(self):
         """Prints vanity header and global stats."""
@@ -522,7 +1128,7 @@ class Ruleset():
         :param key: key to print statistics for
         :type key: string, required
         :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
-        :type keyonly: boolean, optional
+        :type keyonly: bool, optional
         :returns: string contaning stats, suitable for printing to stdout
         :rtype: string
         :raises: `AristotleException`
@@ -554,18 +1160,20 @@ class Ruleset():
         :param key: key to print statistics for
         :type key: string, required
         :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
-        :type keyonly: boolean, optional
+        :type keyonly: bool, optional
         """
         stats_str = self.get_stats(key=key, keyonly=keyonly)
         if stats_str[-1] == '\n':
             stats_str = stats_str[:-1]
         print("{}".format(stats_str))
 
-    def print_ruleset_summary(self, sids):
+    def print_ruleset_summary(self, sids, pfmod_sids=None):
         """Prints summary/truncated filtered ruleset to stdout.
 
         :param sids: list of SIDs.
         :type sids: list, required
+        :param sids: list of SID modified by PFMod.
+        :type sids: list, optional
         :raises: `AristotleException`
         """
         print_debug("print_ruleset_summary() called")
@@ -582,32 +1190,73 @@ class Ruleset():
             else:
                 break
             i += 1
-        print("\n" + BLUE + "Showing {} of {} rules".format(i, len(sids)) + RESET + "\n")
+        print("\n" + BLUE + "Showing {} of {} rules".format(i, len(sids)) + RESET)
+        if pfmod_sids is not None:
+            pfmod_ratio = float(float(len(pfmod_sids)) / float(len(sids)))
+            print(BLUE + "SIDs modifed by PFMod: {} of {} ({:.1%})".format(len(pfmod_sids), len(sids), pfmod_ratio) + RESET)
+            print_debug("SIDs NOT modified by PFMod: {}".format(list(set(sids) - set(pfmod_sids))))
+        print("")
 
-    def output_rules(self, sid_list, outfile=None):
+    def output_rules(self, sid_list, outfile=None, modify_metadata=None):
         """Output rules, given a list of SIDs.
 
         :param sid_list: list of SIDs of the rules to output
         :type sid_list: list, required
         :param outfile: filename to output to; if None, output to stdout; defaults to `None`
         :type outfile: string or None, optional
+        :param modify_metadata: modify the rule metadata keyword value on output to contain the internally tracked and normalized metadata data.
+        :type modify_metadata: bool, optional
         :returns: None
         :rtype: NoneType
         :raises: `AristotleException`
         """
         # TODO: handle order because of/based on flowbits? Ideally IDS engine should handle...
         #       see https://redmine.openinfosecfoundation.org/issues/1399
+
+        if modify_metadata is None:
+            modify_metadata = self.modify_metadata
+        if modify_metadata:
+            # Note: this updates/overwrites the self.metadata_dict[<sid>]['raw_rule'] value
+            # so if your code expects that to be unchanged after calling output_rules(),
+            # that won't be the case.
+            print_debug("Modifying metadata...")
+            for s in sid_list:
+                metadata_string = ""
+                # Sort before building; this way the ruleset hash won't change on every run.
+                # Before Python 3.6, insertion order in dicts isn't necessarily preserved.
+                # Could use an OrderedDict but doing this instead.
+                for key in sorted(self.metadata_dict[s]['metadata'].keys()):
+                    if key == "sid" and self.normalize:
+                        # if normalize set, don't include 'sid' in metadata on output per BETTER recommendation
+                        continue
+                    for val in sorted(self.metadata_dict[s]['metadata'][key]):
+                        metadata_string += "{} {}, ".format(key, val)
+                if len(metadata_string) > 0:
+                    metadata_string = metadata_string[:-2] + ';'
+                    if metadata_keyword_re.search(self.metadata_dict[s]['raw_rule']):
+                        self.metadata_dict[s]['raw_rule'] = metadata_keyword_re.sub(r'\g<PRE>' + metadata_string, self.metadata_dict[s]['raw_rule'])
+                    else:
+                        # no 'metadata' keyword in original rule; add one.
+                        metadata_string = " metadata:{})".format(metadata_string)
+                        self.metadata_dict[s]['raw_rule'] = eol_re.sub(metadata_string, self.metadata_dict[s]['raw_rule'])
+                else:
+                    print_warning("No metadata found for SID {}.".format(s))
         if outfile is None:
             for s in sid_list:
-                print("{}".format(self.metadata_dict[s]['raw_rule']))
+                if not self.metadata_dict[s]['disabled']:
+                    print("{}".format(self.metadata_dict[s]['raw_rule']))
         else:
             try:
                 with open(outfile, "w") as fh:
+                    count = 0
                     for s in sid_list:
-                        fh.write("{}\n".format(self.metadata_dict[s]['raw_rule']))
+                        if not self.metadata_dict[s]['disabled']:
+                            fh.write("{}\n".format(self.metadata_dict[s]['raw_rule']))
+                            count += 1
             except Exception as e:
                 print_error("Problem writing to file '{}':\n{}".format(outfile, e), fatal=True)
-            print(GREEN + "Wrote {} rules to file, '{}'".format(len(sid_list), outfile) + RESET + "\n")
+            print(GREEN + "Wrote {} rules to file, '{}'".format(count, outfile) + RESET + "\n")
+
 
 def get_parser():
     """return parser for command line args"""
@@ -620,17 +1269,16 @@ the metadata key-value pairs as values in a (concrete) Boolean algebra.
 The key-value pair specifications must be surrounded by double quotes.
 Example:
 
-python3 aristotle/aristotle.py -r examples/example.rules --summary -f '(("priority high"
-AND "malware <ALL>") AND "created_at >= 2018-01-01") AND NOT ("protocols smtp"
-OR "protocols pop" OR "protocols imap") OR "sid 80181444"'
-
-"""
+python3 aristotle/aristotle.py -r examples/example.rules --summary -n
+-f '(("priority high" AND "malware <ALL>") AND "created_at >= 2018-01-01")
+AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 80181444"'
+""" + "\r\n"
             )
         parser.add_argument("-r", "--rules", "--ruleset",
                             action="store",
                             dest="rules",
                             required=True,
-                            help="path to rules file or string containing the ruleset")
+                            help="path to a rules file, a directory containing '.rules' file(s), or string containing the ruleset")
         parser.add_argument("-f", "--filter",
                             action="store",
                             dest="metadata_filter",
@@ -666,6 +1314,42 @@ OR "protocols pop" OR "protocols imap") OR "sid 80181444"'
                             required=False,
                             default=False,
                             help="include (effectively enable) disabled rules when applying the filter")
+        parser.add_argument("-n", "--normalize", "--better", "--iso8601",
+                            action="store_true",
+                            dest="normalize",
+                            required=False,
+                            default=False,
+                            help="try to convert date and cve related metadata values to conform to the BETTER schema for filtering and statistics.  Dates are normalized to the format YYYY-MM-DD and CVEs to YYYY-<num>.  Also, 'sid' is removed from the metadata.")
+        parser.add_argument("-e", "--enhance",
+                            action="store_true",
+                            dest="enhance",
+                            required=False,
+                            default=False,
+                            help="enhance metadata by adding additional key-value pairs based on the rules.")
+        parser.add_argument("-t", "--ignore-classtype", "--ignore-classtype-keyword",
+                            action="store_true",
+                            dest="ignore_classtype_keyword",
+                            required=False,
+                            default=False,
+                            help="don't incorporate the 'classtype' keyword and value from the rule into the metadata structure for filtering and reporting.")
+        parser.add_argument("-g", "--ignore-filename",
+                            action="store_true",
+                            dest="ignore_filename",
+                            required=False,
+                            default=False,
+                            help="don't incorporate the 'filename' keyword (filename of the rules file) into the metadata structure for filtering and reporting.")
+        parser.add_argument("-m", "--modify-metadata",
+                            action="store_true",
+                            dest="modify_metadata",
+                            required=False,
+                            default=False,
+                            help="modify the rule metadata keyword value on output to contain the internally tracked and normalized metadata data.")
+        parser.add_argument("-p", "--pfmod", "--pfmod-file",
+                            action="store",
+                            dest="pfmod_file",
+                            required=False,
+                            default=None,
+                            help="YAML file of directives to apply actions on post-filtered rules based on filter strings.")
         parser.add_argument("-q", "--quiet", "--suppress_warnings",
                             action="store_true",
                             dest="suppress_warnings",
@@ -712,7 +1396,10 @@ def main():
     if args.stats is not None:
         keys = []
         keyonly = False
-        rs = Ruleset(rules=args.rules)
+        rs = Ruleset(rules=args.rules,
+                     ignore_classtype_keyword=args.ignore_classtype_keyword,
+                     ignore_filename=args.ignore_filename,
+                     normalize=args.normalize, enhance=args.enhance, modify_metadata=args.modify_metadata)
         rs.print_header()
         if len(args.stats) > 0:
             # print stats for specified key(s)
@@ -730,21 +1417,32 @@ def main():
 
     # create object
     rs = Ruleset(rules=args.rules, metadata_filter=args.metadata_filter,
-                 include_disabled_rules=args.include_disabled_rules)
+                 include_disabled_rules=args.include_disabled_rules,
+                 ignore_classtype_keyword=args.ignore_classtype_keyword,
+                 ignore_filename=args.ignore_filename,
+                 normalize=args.normalize,
+                 enhance=args.enhance,
+                 modify_metadata=args.modify_metadata,
+                 pfmod_file=args.pfmod_file)
 
     filtered_sids = rs.filter_ruleset()
 
-    print_debug("filtered_sids: {}".format(filtered_sids))
+    #print_debug("filtered_sids: {}".format(filtered_sids))
+
+    pfmod_sids = None
+    if rs.pfmod_file:
+        pfmod_sids = rs._pfmod_apply(filtered_sids)
+        #print_debug("pfmod_sids: {}".format(pfmod_sids))
 
     if args.outfile == "<stdout>":
         if args.summary_ruleset:
-            rs.print_ruleset_summary(filtered_sids)
+            rs.print_ruleset_summary(filtered_sids, pfmod_sids)
         else:
-            rs.output_rules(sid_list=filtered_sids, outfile=None)
+            rs.output_rules(sid_list=filtered_sids, outfile=None, modify_metadata=args.modify_metadata)
     else:
         if args.summary_ruleset:
-            rs.print_ruleset_summary(filtered_sids)
-        rs.output_rules(sid_list=filtered_sids, outfile=args.outfile)
+            rs.print_ruleset_summary(filtered_sids, pfmod_sids)
+        rs.output_rules(sid_list=filtered_sids, outfile=args.outfile, modify_metadata=args.modify_metadata)
 
 if __name__== "__main__":
     main()
