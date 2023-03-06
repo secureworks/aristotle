@@ -1,0 +1,123 @@
+Post Filter Modification ("PFMod")
+==================================
+
+Overview
+--------
+
+Aristotle offers the option to further filter *and modify* the ruleset,
+after the initial filter string and metadata enhancements (if so enabled)
+are applied.  This is known as "Post Filter Modification", a.k.a. "PFMod".
+
+PFMod allows for the identification of rules based on :doc:`Filter Strings <filter_strings>`, and
+then particular "actions" taken on those rules.  :ref:`PFMod Actions` include the
+ability to add/delete metadata, set ``priority``, and do a regular expression
+based find and replace on the full rule.
+
+PFMod YAML Format
+-----------------
+
+.. note::
+    Keep in mind, this is a YAML file and entries must conform to the YAML specification.
+
+PFMod rules (not to be confused with Suricata or Snort rules) are defined in
+YAML format and the rules YAML file passed to Aristotle. Some notes about the
+PFMod YAML format:
+
+-  The ``version`` key is optional and can be used (in the future) to distinguish among different
+   PFMod format versions.  However, at this point there is only one version -- 1.0.
+-  Under the ``rules`` key is a list of (PFMod) rules each with its applicable data:
+
+   -  ``name`` - optional but useful for a description of the rule, and used in error output.
+   -  ``filter_string`` - required;  the :doc:`Filter String <filter_strings>` to use against the (initially filtered)
+      ruleset whose results will be the object of the rule's actions.
+   -  ``actions`` - required;  a list of actions to perform on the rules that matched the filter string
+      in the rule.
+
+.. warning:: PFMod requires that the "modify" (``-m``) be set and will enable it, if not enabled,
+     if a PFMod file is given.
+
+PFMod Actions
+*************
+
+Supported ``actions`` are:
+
+-  ``disable`` - disable the rule.  This is a standalone string in the list.
+-  ``add_metadata`` - key-value pair where the value is the metadata key-value pair to add (e.g. ``protocols http``).
+   Note that if there is already metadata using the given key, it is not over written (unless the values are the
+   same too in which case nothing is added since it already exists).
+-  ``add_metadata_exclusive`` - key-value pair where the value is the metadata key-value pair to add (e.g. ``priority high``).
+   If the given key already exists, overwrite it with the new value.
+-  ``delete_metadata`` - if a key-value pair is given (e.g. ``former_category malware``) remove the key-value pair
+   from the rule.  If just a key name is given (e.g. ``former_category``), remove all metadata using the given key,
+   regardless of the value.
+-  ``set_priority`` -- set the priority tag in the rule to have the given value.  If the rule does not contain
+   a priority keyword, add it and set the value to the given value.
+-  ``regex_sub`` -- Perform a RegEx find and replace on the rule based on the given value. Details:
+
+    -  Values follow the format ``/regex-to-find/replacement_string/i``
+    -  A trailing ``i`` after the pattern makes the match case insensitive,
+       e.g. ``"regex_sub /(Not\x20|In)sensitive/quite\20/i"``.
+    -  Patterns are passed to the Python ``re.sub()`` function *as raw strings*
+       and support whatever the ``re`` library of the running version of Python supports.
+    -  For ``regex_sub`` values, it is recommended that they be *single quoted*.  Double
+       quoted strings in YAML will interpret the backslash character as a control character
+       which will cause issues in non-trivial regex if not encoded.
+
+.. note::
+    PFMod ``rules`` and ``actions`` are applied in the order they are processed -- from top to bottom of the file. This
+    means that, depending on how the rules and actions are written, subsequent rules and actions can affect changes
+    made by previous rules and actions.
+
+Example PFMod YAML File
+-----------------------
+
+.. code-block:: yaml
+
+    %YAML 1.1
+    ---
+
+    # Created By George P. Burdell 2023-03-02
+    # For DMZ perimiter
+
+    version: "1.0"
+    rules:
+      - name: ip-rules-inbound
+        filter_string: >-
+          (
+            "filename ip-blocklist.rules" OR "msg_regex /\x203CORESec\x20/i"
+            OR "rule_regex /^(pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+ip\s+/"
+          ) AND (
+            "detection_direction inbound"
+          )
+        actions:
+          - add_metadata_exclusive: "risk_score 10"
+          - set_priority: 2
+      - name: ip-rules-outbound
+        filter_string: >-
+          (
+            "detection_direction outbound"
+            AND "rule_regex /^(pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+ip\s+/"
+            AND "signature_severity major"
+          )
+        actions:
+          - add_metadata_exclusive: "risk_score 51"
+          - add_metadata: "soc_response_color brown"
+          - set_priority: 3
+      - name: drop-inbound-dns-requests
+        filter_string: >-
+          (
+            "detection_direction inbound" OR "detection_direction inbound-notexclusive"
+          ) AND (
+            "protocols dns"
+            AND "rule_regex /dns[\x2E\x5F]query|3B|/"
+          )
+        actions:
+          - regex_sub: '/^alert\x20/drop /'
+          - add_metadata: "custom_action drop"
+      - name: disable-informational-and-audit
+        filter_string: >-
+          "signature_severity informational" OR "signature_severity audit"
+          OR "msg_regex /INFORMATIONAL/i" OR "rule_regex /[\s\x3B\x28]priority\s*\x3A\s*5\s*\x3B"
+        actions:
+          - disable
+

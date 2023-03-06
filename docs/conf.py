@@ -22,13 +22,13 @@ import pygments
 # -- Project information -----------------------------------------------------
 
 project = u'Aristotle'
-copyright = u'2019, Secureworks'
+copyright = u'2019 Secureworks, Inc., 2023 Uber Technologies, Inc.'
 author = u'David Wharton'
 
 # The short X.Y version
-version = u'1.0'
+version = u'2.0'
 # The full version, including alpha/beta/rc tags
-release = u'1.0.2'
+release = u'2.0.0'
 
 
 # -- General configuration ---------------------------------------------------

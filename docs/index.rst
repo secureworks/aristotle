@@ -18,6 +18,7 @@ script or utilized as a module.
    setup
    usage
    filter_strings
+   post_filter_mod
    module
    license-authors
 

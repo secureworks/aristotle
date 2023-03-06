@@ -5,9 +5,9 @@ with open("README.rst", "r") as fh:
 
 setup(
     name="aristotle",
-    version="1.0.5",
+    version="2.0.0",
     author="David Wharton",
-    description="Script and library for the viewing and filtering of Suricata and Snort rulesets based on interpreted key-value pairs present in the metadata keyword within each rule.",
+    description="Script and library for the viewing, filtering, and modifying of Suricata and Snort rulesets based on interpreted key-value pairs present in the metadata keyword within each rule.",
     long_description=long_description,
     long_description_content_type="text/x-rst",
     url="https://github.com/secureworks/aristotle",
@@ -28,7 +28,7 @@ setup(
         "Topic :: System :: Networking :: Firewalls",
     ],
     python_requires='>=2.7',
-    keywords='suricata, snort, metadata, ruleset, BETTER, IDS, IPS, signatures',
+    keywords='suricata, snort, metadata, ruleset, BETTER, IDS, IPS, NIDS, signatures',
     project_urls={
         'Documentation': 'https://aristotle-py.readthedocs.io/',
         'Source': 'https://github.com/secureworks/aristotle',
