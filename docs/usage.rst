@@ -212,6 +212,14 @@ the unique values will be considered.
 This default behavior can be changed with a command line switch or in
 the :ref:`Ruleset class constructor <target Ruleset class>`.
 
+Filename
+--------
+
+If a rule was loaded from a file, Aristotle will add the ``filename`` key-value pair so that it can be
+used for filtering and statistics generation.  The value will be the filename the rule was read from.
+This default behavior can be changed with a command line switch or in
+the :ref:`Ruleset class constructor <target Ruleset class>`.
+
 .. _target Normalize Metadata:
 
 Normalize
@@ -228,8 +236,8 @@ to the internal data structure used to store metadata and filter against:
     be attempted to be normalized to ``YYYY-MM-DD``.  A failure to parse or normalize
     the value will result in a warning message and the value being unchanged.
 
-If the `update metadata`
-option is set then the normalized values, rather than the originals, will be
+If the :ref:`Modify Metadata`
+option is also set then the normalized values, rather than the originals, will be
 included in the output, and the ``sid`` key will be removed from the metadata.
 
 .. _target Enhance Metadata:
@@ -243,7 +251,19 @@ to update the metadata on each.
 
   - ``flow`` key with values normalized to be ``to_sever``   ` or ``to_client``.
   - ``protocols`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
+  - ``cve`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
+    The value(s) are based on data exracted from the raw rule, e.g. ``msg`` field, ``reference`` keyword, etc.
+  - ``mitre_attack`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
+    The value(s) are based on data exracted from the rule's ``reference`` keyword.
+  - ``hostile`` key and applicable values (``dest_ip`` or ``src_ip``, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
+    The values are the inverse of values taken from the ``target`` keyword.
+  - ``classtype``\* key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
+    See the :ref:`Classtype` section.
+  - ``filename``\* key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
+    The value will be the filename the rule came from, if the rule was loaded from a file.  See the :ref:`Filename` section.
   - ``detection_direction`` keyword (see below).
+
+\* Key added by default unless explicitly disabled.
 
 Detection Direction
 ...................
@@ -264,13 +284,16 @@ any                            ``any -> any``
 both                           direction in rule is ``<>``
 =============================  ==============================
 
-Update Metadata
+Modify Metadata
 ---------------
+
+.. note::
+    No metadata is altered on output unless the Modify Metdata option is set!
 
 The command line and the :ref:`Ruleset class constructor <target Ruleset class>` offer
 the option to update the metadata keyword value on output.  If this option is not set,
 Aristotle does not modify rules, it just enable or disables them based on the given
-filter.  However, if the `update metadata` option is set, then the value of the ``metadata``
+filter.  However, if the `modify metadata` option is set, then the value of the ``metadata``
 keyword will be replaced with a string sourced form the internal data structure that
 Aristotle uses to track, parse, and filter metadata. Practically, the metadata will
 be updated accordingly:
@@ -283,6 +306,11 @@ be updated accordingly:
 
 Additionally, the order of the key-value pairs in the metadata will be sorted by
 key and then value.
+
+.. important:: To enable efficient boolean logic application and because metadata is considered
+    by Aristotle to be case insensitive per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#details>`__,
+    metadata key-value pairs are represented internally as lowercase.  Therefore, if :ref:`Modify Metadata` is
+    enabled, the outputted metadata key-value pairs will be all lowercase.
 
 Post Filter Modification
 ------------------------
