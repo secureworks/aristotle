@@ -502,8 +502,8 @@ class Ruleset():
 
     def normalize_better(self, k, v):
         """ Try to convert date and cve related metadata values to conform to the
-            BETTER schema for filtering and statistics. Currently applies to keys,
-            'cve' and those ending with '_at' or "-at".
+            BETTER schema for filtering and statistics. Currently applies to keys
+            'cve', 'mitre_tactic_id', 'mitre_technique_id' and those ending with '_at' or "-at".
 
             :param k: key name of a metadata key-value pair
             :type k: string, required
@@ -531,6 +531,10 @@ class Ruleset():
                 print_warning("Unable to parse '{}' value '{}'".format(k, v))
             for cve in cves:
                 retlist.append([k, cve])
+        elif k in ['mitre_technique_id', 'mitre_tactic_id']:
+            # pull values out of 'mitre_tactic_id' and 'mitre_technique_id' metadata and
+            # put into BETTER 'mitre_attack' key
+            retlist.append(["mitre_attack", v])
         else:
             retlist.append([k, v])
         return retlist
