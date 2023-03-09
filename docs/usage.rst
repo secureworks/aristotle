@@ -126,6 +126,12 @@ The statistics command line option allows a user to to easily see what
 metadata key-value pairs the ruleset contains to assist in building a
 filter string.
 
+.. note::
+    If a filter string is provided, or other options to manipulate the metadata (e.g.
+    :ref:`Normalize`, :ref:`Modify Metadata`) are set, along with a request for
+    statistics, then the filter and/or other manipulations are performed first,
+    and the statistics outputted apply to the filtered/modified ruleset.
+
 If no key names are passed, summary info on all present keys is
 displayed:
 
