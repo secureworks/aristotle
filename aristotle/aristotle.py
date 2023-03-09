@@ -1305,13 +1305,16 @@ AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 801814
                             default = None,
                             help="Boolean filter string or path to a file containing it")
         parser.add_argument("--summary",
-                            action="store_true",
-                            dest="summary_ruleset",
+                            action="store",
+                            dest="display_max",
                             required=False,
-                            default = False,
-                            help="output a summary of the filtered ruleset to stdout; \
-                                  if an output file is given, the full, filtered ruleset \
-                                  will still be written to it.")
+                            type=int,
+                            nargs='?',
+                            default = -1,
+                            help="output a summary of the filtered ruleset to stdout, limited \
+                                  to DISPLAY_MAX number of lines (or 16 if no value given); \
+                                  if the option to output to a file is set, the full, filtered ruleset \
+                                  will still be written.")
         parser.add_argument("-o", "--output",
                             action="store",
                             dest="outfile",
@@ -1389,6 +1392,7 @@ AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 801814
 def main():
     """Main method, called if run as script."""
     global aristotle_logger
+    print_summary = False
 
     # program is run not as library so add logging to console
     aristotle_logger.addHandler(logging.StreamHandler())
@@ -1412,9 +1416,20 @@ def main():
     if args.stats is None and args.metadata_filter is None:
         print_error("'metadata_filter' or 'stats' option required. Neither provided.", fatal=True)
 
+    if args.display_max is None:
+        # option set but not max given; default to 16
+        args.display_max = 16
+        print_summary = True
+    elif args.display_max == -1:
+        # option not set
+        print_summary = False
+    else:
+        print_summary = True
+
     # create object
     rs = Ruleset(rules=args.rules, metadata_filter=args.metadata_filter,
                  include_disabled_rules=args.include_disabled_rules,
+                 summary_max=args.display_max,
                  ignore_classtype_keyword=args.ignore_classtype_keyword,
                  ignore_filename=args.ignore_filename,
                  normalize=args.normalize,
@@ -1452,12 +1467,12 @@ def main():
         sys.exit(0)
 
     if args.outfile == "<stdout>":
-        if args.summary_ruleset:
+        if print_summary:
             rs.print_ruleset_summary(filtered_sids, pfmod_sids)
         else:
             rs.output_rules(sid_list=filtered_sids, outfile=None, modify_metadata=args.modify_metadata)
     else:
-        if args.summary_ruleset:
+        if print_summary:
             rs.print_ruleset_summary(filtered_sids, pfmod_sids)
         rs.output_rules(sid_list=filtered_sids, outfile=args.outfile, modify_metadata=args.modify_metadata)
 
