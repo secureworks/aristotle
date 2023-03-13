@@ -3,22 +3,23 @@ Usage
 
 .. code:: console
 
-    usage: aristotle.py [-h] -r RULES [-f METADATA_FILTER] [--summary] [-o OUTFILE] [-s [STATS [STATS ...]]] [-i] [-n] [-e] [-t] [-g] [-m]
+    usage: aristotle.py [-h] -r RULES [-f METADATA_FILTER] [--summary [DISPLAY_MAX]] [-o OUTFILE] [-s [STATS ...]] [-i] [-n] [-e] [-t] [-g] [-m]
                         [-p PFMOD_FILE] [-q] [-d]
 
     Filter Suricata and Snort rulesets based on metadata keyword values.
 
-    optional arguments:
+    options:
       -h, --help            show this help message and exit
       -r RULES, --rules RULES, --ruleset RULES
                             path to a rules file, a directory containing '.rules' file(s), or string containing the ruleset
       -f METADATA_FILTER, --filter METADATA_FILTER
                             Boolean filter string or path to a file containing it
-      --summary             output a summary of the filtered ruleset to stdout; if an output file is given, the full, filtered ruleset will still
-                            be written to it.
+      --summary [DISPLAY_MAX]
+                            output a summary of the filtered ruleset to stdout, limited to DISPLAY_MAX number of lines (or 16 if no value given);
+                            if the option to output to a file is set, the full, filtered ruleset will still be written.
       -o OUTFILE, --output OUTFILE
                             output file to write filtered ruleset to
-      -s [STATS [STATS ...]], --stats [STATS [STATS ...]]
+      -s [STATS ...], --stats [STATS ...]
                             display ruleset statistics about specified key(s). If no key(s) supplied, then summary statistics for all keys will be
                             displayed.
       -i, --include-disabled
@@ -125,6 +126,12 @@ Statistics
 The statistics command line option allows a user to to easily see what
 metadata key-value pairs the ruleset contains to assist in building a
 filter string.
+
+.. note::
+    If a filter string is provided, or other options to manipulate the metadata (e.g.
+    :ref:`Normalize`, :ref:`Modify Metadata`) are set, along with a request for
+    statistics, then the filter and/or other manipulations are performed first,
+    and the statistics outputted apply to the filtered/modified ruleset.
 
 If no key names are passed, summary info on all present keys is
 displayed:

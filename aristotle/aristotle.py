@@ -1001,9 +1001,6 @@ class Ruleset():
         :returns: list of matching SIDs
         :rtype: list
         """
-        # TODO: support 'disable' action?
-        # TODO: call filter_ruleset() but then keep intersection of returned sids and sids passed to this function
-
         # see docs
         valid_actions_str = ["disable"]
         valid_actions_dict = ["add_metadata",
@@ -1112,10 +1109,16 @@ class Ruleset():
                         continue
         return matched_sids_all
 
-    def print_header(self):
-        """Prints vanity header and global stats."""
-        total = len(self.metadata_dict)
-        enabled = len([sid for sid in self.metadata_dict.keys() \
+    def print_header(self, sids=None):
+        """ Prints vanity header and stats.
+
+        :param sids: list of SIDs to consider. If not provided, global list is used.
+        :type sids: list, optional
+        """
+        if sids is None:
+            sids = list(self.metadata_dict.keys())
+        total = len(sids)
+        enabled = len([sid for sid in sids \
                     if not self.metadata_dict[sid]['disabled']])
         disabled = total - enabled
         print("\n" + INVERSE + BROWN + "       Aristotle       " + \
@@ -1126,24 +1129,29 @@ class Ruleset():
               " Total: {}; Enabled: {}; Disabled: {}".format(total, enabled, disabled) + \
               RESET + "\n")
 
-    def get_stats(self, key, keyonly=False):
+    def get_stats(self, key, keyonly=False, sids=None):
         """Returns string of statistics (total, enabled, disabled) for specified key and its values.
 
         :param key: key to print statistics for
         :type key: string, required
         :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
         :type keyonly: bool, optional
+        :param sids: list of SIDs to consider. If not provided, global list is used.
+        :type sids: list, optional
         :returns: string contaning stats, suitable for printing to stdout
         :rtype: string
         :raises: `AristotleException`
         """
         retstr = ""
+        sids_orig = sids
+        if sids is None:
+            sids = list(self.metadata_dict.keys())
         if key not in self.keys_dict.keys():
             print_warning("key '{}' not found".format(key))
             return
-        total = len([sid for sid in self.metadata_dict.keys() \
+        total = len([sid for sid in sids \
                      if key in self.metadata_dict[sid]['metadata'].keys()])
-        enabled = len([sid for sid in self.metadata_dict.keys() \
+        enabled = len([sid for sid in sids \
                      if key in self.metadata_dict[sid]['metadata'].keys() \
                      and not self.metadata_dict[sid]['disabled']])
         disabled = total - enabled
@@ -1151,22 +1159,29 @@ class Ruleset():
 
         if not keyonly:
             for value in self.keys_dict[key].keys():
-                total = len(self.keys_dict[key][value])
-                enabled = len([sid for sid in self.keys_dict[key][value] if not self.metadata_dict[sid]['disabled']])
+                # use if/else to speed things up when filter not in use
+                if sids_orig is None:
+                    total = len(self.keys_dict[key][value])
+                    enabled = len([sid for sid in self.keys_dict[key][value] if not self.metadata_dict[sid]['disabled']])
+                else:
+                    total = len([s for s in sids if s in self.keys_dict[key][value]])
+                    enabled = len([sid for sid in self.keys_dict[key][value] if sid in sids and not self.metadata_dict[sid]['disabled']])
                 disabled = total - enabled
                 retstr += "\t{} (Total: {}; Enabled: {}; Disabled: {})\n".format(ORANGE + value + RESET, total, enabled, disabled)
             retstr += "\n"
         return retstr
 
-    def print_stats(self, key, keyonly=False):
+    def print_stats(self, key, keyonly=False, sids=None):
         """Print statistics (total, enabled, disabled) for specified key and its values.
 
-        :param key: key to print statistics for
+        :param key: key to print statistics for.
         :type key: string, required
-        :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`
+        :param keyonly: only print stats for the key itself and not stats for all possible key-value pairs, defaults to `False`.
         :type keyonly: bool, optional
+        :param sids: list of SIDs to scope stats to. If None, global list will be used downstream.
+        :type sids: list, optional
         """
-        stats_str = self.get_stats(key=key, keyonly=keyonly)
+        stats_str = self.get_stats(key=key, keyonly=keyonly, sids=sids)
         if stats_str[-1] == '\n':
             stats_str = stats_str[:-1]
         print("{}".format(stats_str))
@@ -1176,7 +1191,7 @@ class Ruleset():
 
         :param sids: list of SIDs.
         :type sids: list, required
-        :param sids: list of SID modified by PFMod.
+        :param pfmod_sids: list of SID modified by PFMod.
         :type sids: list, optional
         :raises: `AristotleException`
         """
@@ -1290,13 +1305,16 @@ AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 801814
                             default = None,
                             help="Boolean filter string or path to a file containing it")
         parser.add_argument("--summary",
-                            action="store_true",
-                            dest="summary_ruleset",
+                            action="store",
+                            dest="display_max",
                             required=False,
-                            default = False,
-                            help="output a summary of the filtered ruleset to stdout; \
-                                  if an output file is given, the full, filtered ruleset \
-                                  will still be written to it.")
+                            type=int,
+                            nargs='?',
+                            default = -1,
+                            help="output a summary of the filtered ruleset to stdout, limited \
+                                  to DISPLAY_MAX number of lines (or 16 if no value given); \
+                                  if the option to output to a file is set, the full, filtered ruleset \
+                                  will still be written.")
         parser.add_argument("-o", "--output",
                             action="store",
                             dest="outfile",
@@ -1374,6 +1392,7 @@ AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 801814
 def main():
     """Main method, called if run as script."""
     global aristotle_logger
+    print_summary = False
 
     # program is run not as library so add logging to console
     aristotle_logger.addHandler(logging.StreamHandler())
@@ -1397,14 +1416,43 @@ def main():
     if args.stats is None and args.metadata_filter is None:
         print_error("'metadata_filter' or 'stats' option required. Neither provided.", fatal=True)
 
+    if args.display_max is None:
+        # option set but not max given; default to 16
+        args.display_max = 16
+        print_summary = True
+    elif args.display_max == -1:
+        # option not set
+        print_summary = False
+    else:
+        print_summary = True
+
+    # create object
+    rs = Ruleset(rules=args.rules, metadata_filter=args.metadata_filter,
+                 include_disabled_rules=args.include_disabled_rules,
+                 summary_max=args.display_max,
+                 ignore_classtype_keyword=args.ignore_classtype_keyword,
+                 ignore_filename=args.ignore_filename,
+                 normalize=args.normalize,
+                 enhance=args.enhance,
+                 modify_metadata=args.modify_metadata,
+                 pfmod_file=args.pfmod_file)
+
+    if args.stats is None or rs.metadata_filter is not None:
+        filtered_sids = rs.filter_ruleset()
+    else:
+        filtered_sids = [s for s in rs.metadata_dict.keys()]
+    #print_debug("filtered_sids: {}".format(filtered_sids))
+
+    pfmod_sids = None
+    if rs.pfmod_file:
+        pfmod_sids = rs._pfmod_apply(filtered_sids)
+        #print_debug("pfmod_sids: {}".format(pfmod_sids))
+
+    # if stats requested, print out stats on filtered/modified ruleset
     if args.stats is not None:
         keys = []
         keyonly = False
-        rs = Ruleset(rules=args.rules,
-                     ignore_classtype_keyword=args.ignore_classtype_keyword,
-                     ignore_filename=args.ignore_filename,
-                     normalize=args.normalize, enhance=args.enhance, modify_metadata=args.modify_metadata)
-        rs.print_header()
+        rs.print_header(sids=filtered_sids)
         if len(args.stats) > 0:
             # print stats for specified key(s)
             keys = args.stats
@@ -1414,37 +1462,17 @@ def main():
             keyonly = True
 
         for key in keys:
-            rs.print_stats(key=key, keyonly=keyonly)
-
+            rs.print_stats(key=key, keyonly=keyonly, sids=None if rs.metadata_filter is None else filtered_sids)
         print("")
         sys.exit(0)
 
-    # create object
-    rs = Ruleset(rules=args.rules, metadata_filter=args.metadata_filter,
-                 include_disabled_rules=args.include_disabled_rules,
-                 ignore_classtype_keyword=args.ignore_classtype_keyword,
-                 ignore_filename=args.ignore_filename,
-                 normalize=args.normalize,
-                 enhance=args.enhance,
-                 modify_metadata=args.modify_metadata,
-                 pfmod_file=args.pfmod_file)
-
-    filtered_sids = rs.filter_ruleset()
-
-    #print_debug("filtered_sids: {}".format(filtered_sids))
-
-    pfmod_sids = None
-    if rs.pfmod_file:
-        pfmod_sids = rs._pfmod_apply(filtered_sids)
-        #print_debug("pfmod_sids: {}".format(pfmod_sids))
-
     if args.outfile == "<stdout>":
-        if args.summary_ruleset:
+        if print_summary:
             rs.print_ruleset_summary(filtered_sids, pfmod_sids)
         else:
             rs.output_rules(sid_list=filtered_sids, outfile=None, modify_metadata=args.modify_metadata)
     else:
-        if args.summary_ruleset:
+        if print_summary:
             rs.print_ruleset_summary(filtered_sids, pfmod_sids)
         rs.output_rules(sid_list=filtered_sids, outfile=args.outfile, modify_metadata=args.modify_metadata)
 

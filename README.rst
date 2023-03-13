@@ -52,31 +52,37 @@ Usage
 
 .. code:: console
 
-    usage: aristotle.py [-h] -r RULES [-f METADATA_FILTER] [--summary] [-o OUTFILE] [-s [STATS [STATS ...]]] [-i] [-n] [-e] [-t] [-g] [-m] [-p PFMOD_FILE] [-q] [-d]
+    usage: aristotle.py [-h] -r RULES [-f METADATA_FILTER] [--summary [DISPLAY_MAX]] [-o OUTFILE] [-s [STATS ...]] [-i] [-n] [-e] [-t] [-g] [-m]
+                        [-p PFMOD_FILE] [-q] [-d]
 
     Filter Suricata and Snort rulesets based on metadata keyword values.
 
-    optional arguments:
+    options:
       -h, --help            show this help message and exit
       -r RULES, --rules RULES, --ruleset RULES
                             path to a rules file, a directory containing '.rules' file(s), or string containing the ruleset
       -f METADATA_FILTER, --filter METADATA_FILTER
                             Boolean filter string or path to a file containing it
-      --summary             output a summary of the filtered ruleset to stdout; if an output file is given, the full, filtered ruleset will still be written to it.
+      --summary [DISPLAY_MAX]
+                            output a summary of the filtered ruleset to stdout, limited to DISPLAY_MAX number of lines (or 16 if no value given);
+                            if the option to output to a file is set, the full, filtered ruleset will still be written.
       -o OUTFILE, --output OUTFILE
                             output file to write filtered ruleset to
-      -s [STATS [STATS ...]], --stats [STATS [STATS ...]]
-                            display ruleset statistics about specified key(s). If no key(s) supplied, then summary statistics for all keys will be displayed.
+      -s [STATS ...], --stats [STATS ...]
+                            display ruleset statistics about specified key(s). If no key(s) supplied, then summary statistics for all keys will be
+                            displayed.
       -i, --include-disabled
                             include (effectively enable) disabled rules when applying the filter
       -n, --normalize, --better, --iso8601
-                            try to convert date and cve related metadata values to conform to the BETTER schema for filtering and statistics. Dates are normalized to the format YYYY-MM-DD and
-                            CVEs to YYYY-<num>. Also, 'sid' is removed from the metadata.
+                            try to convert date and cve related metadata values to conform to the BETTER schema for filtering and statistics. Dates
+                            are normalized to the format YYYY-MM-DD and CVEs to YYYY-<num>. Also, 'sid' is removed from the metadata.
       -e, --enhance         enhance metadata by adding additional key-value pairs based on the rules.
       -t, --ignore-classtype, --ignore-classtype-keyword
-                            don't incorporate the 'classtype' keyword and value from the rule into the metadata structure for filtering and reporting.
+                            don't incorporate the 'classtype' keyword and value from the rule into the metadata structure for filtering and
+                            reporting.
       -g, --ignore-filename
-                            don't incorporate the 'filename' keyword (filename of the rules file) into the metadata structure for filtering and reporting.
+                            don't incorporate the 'filename' keyword (filename of the rules file) into the metadata structure for filtering and
+                            reporting.
       -m, --modify-metadata
                             modify the rule metadata keyword value on output to contain the internally tracked and normalized metadata data.
       -p PFMOD_FILE, --pfmod PFMOD_FILE, --pfmod-file PFMOD_FILE
