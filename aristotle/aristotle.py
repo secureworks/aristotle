@@ -1195,7 +1195,7 @@ class Ruleset():
                 break
             i += 1
         print("\n" + BLUE + "Showing {} of {} rules".format(i, len(sids)) + RESET)
-        if pfmod_sids is not None:
+        if pfmod_sids is not None and len(sids) > 0:
             pfmod_ratio = float(float(len(pfmod_sids)) / float(len(sids)))
             print(BLUE + "SIDs modifed by PFMod: {} of {} ({:.1%})".format(len(pfmod_sids), len(sids), pfmod_ratio) + RESET)
             print_debug("SIDs NOT modified by PFMod: {}".format(list(set(sids) - set(pfmod_sids))))
