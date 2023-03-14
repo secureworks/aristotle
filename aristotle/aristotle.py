@@ -413,7 +413,7 @@ class Ruleset():
             match_obj = flow_re.search(rule)
             if match_obj:
                 # normalize so direction is "to_client" or "to_server"
-                flow_str = match_obj.group("FLOW").lower().replace("from_server", "to_client").replace("from_client", "to_sever")
+                flow_str = match_obj.group("FLOW").lower().replace("from_server", "to_client").replace("from_client", "to_server")
                 flows = [f.strip() for f in flow_str.split(',')]
                 direction_found = False
                 for v in flows:
