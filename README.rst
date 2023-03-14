@@ -20,8 +20,8 @@ metadata keys. If a filter string is provided, it will also be applied
 against the ruleset and the filtered ruleset outputted.
 
 Aristotle also offers the ability to intelligently process rules to extract, enrich, and add
-metadata to rules.  After initial filtering, rules can additionally
-undergo "Post Filter Modification" which modifies rules
+metadata to them.  After initial filtering, rules can additionally
+undergo "Post Filter Modification" which can modify them
 based on user-defined criteria, to help ensure the resulting
 rules in the ruleset are enabled, configured, and optimized for the target environment.
 
