@@ -180,15 +180,6 @@ class Ruleset():
         except Exception as e:
             print_error("Unable to process 'summary_max' value '{}' passed to Ruleset constructor:\n{}".format(summary_max, e))
 
-        if self.pfmod_file:
-            try:
-                if not os.path.isfile(self.pfmod_file):
-                    print_error("'{}': file not found.".format(self.pfmod_file), fatal=True)
-                with open(self.pfmod_file, 'r') as fh:
-                    self.pfmod_rules = yaml.safe_load(fh)
-            except Exception as e:
-                print_error("Unable to open YAML file '{}': {}".format(self.pfmod_file, e), fatal=True)
-            # YAML loaded, will process later and validate then
         # deal with rules file(s)
         try:
             if os.path.isfile(rules):
@@ -993,9 +984,11 @@ class Ruleset():
         except Exception as e:
             print_error("Problem processing metadata_filter string:\n\n{}\n\nError:\n{}".format(metadata_filter_original, e), fatal=True)
 
-    def _pfmod_apply(self, sids):
+    def _pfmod_apply(self, pfmod_file, sids):
         """ Applies the directives in the pfmod YAML file to passed in SIDs
 
+        :param pfmod_file: filename of FPMod file
+        :type pfmod_file: string, required
         :param sids: list of sids to scope to
         :type sids: list, required
         :returns: list of matching SIDs
@@ -1013,100 +1006,118 @@ class Ruleset():
         matched_sids_all = set()
 
         print_debug("pfmod_apply() called")
-        if "rules" not in self.pfmod_rules.keys():
-            print_error("No 'rules' directives defined in file '{}'.".format(self.pfmod_file), fatal=True)
-        if "version" in self.pfmod_rules.keys():
-            print_debug("Processing PFMod rules, version {}.".format(self.pfmod_rules['version']))
-        for rule in self.pfmod_rules['rules']:
-            rule_name = "<undefined>"
-            if "name" in rule.keys():
-                rule_name = rule['name']
-                print_debug("Processing PFMod rule '{}'".format(rule_name))
-            for k in ["filter_string", "actions"]:
-                if k not in rule.keys():
-                    print_error("No '{}' defined for PFMod rule '{}'".format(k, rule_name), fatal=True)
-            #print_debug("Filter String: {}".format(rule['filter_string']))
-            try:
-                matched_sids = self.filter_ruleset(rule['filter_string'])
-            except Exception as e:
-                print_error("Unable to apply filter string '{}' in PFMod rule named '{}'.".format(rule['filter_string'], rule_name), fatal=True)
-            #print_debug("matched_sids: {}\npassed sids: {}".format(matched_sids, sids))
-            matched_sids = list(set(sids) & set(matched_sids))
-            matched_sids_all.update(matched_sids)
-            #print_debug("Matched sids: {}".format(matched_sids))
-            print_debug("Rule:\n\t{}\n\tModified: {}".format(rule_name, len(matched_sids)))
-            for sid in matched_sids:
-                for action in rule['actions']:
-                    if type(action) == str:
-                        if action not in valid_actions_str:
-                            print_error("Invalid action '{}' in PFMod rule named '{}'. Supported str actions are: {}.".format(action, rule_name, valid_actions_str))
-                            continue
-                        if action != 'disable':
-                            print_error("Action not implemented: '{}'.".format(action))
-                            continue
-                        self.metadata_dict[sid]['disabled'] = True
-                    elif type(action) == dict:
-                        for action_key in action.keys():
-                            action_key = action_key.strip()
-                            if action_key not in valid_actions_dict:
-                                print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict))
-                                continue
-                            if len(str(action[action_key]).strip()) == 0:
-                                print_error("No value for action '{}'.".format(action_key), fatal=True)
-                            if action_key == "delete_metadata":
-                                a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
-                                if len(a) < 2:
-                                    key = a[0]
-                                    print_debug("Deleting all metadata for key '{}'.".format(key))
-                                    self.delete_metadata(sid, key)
-                                else:
-                                    key = a[0]
-                                    value = a[1]
-                                    print_debug("Deleting all metadata with key-value pair '{} {}'.".format(key, value))
-                                    self.delete_metadata(sid, key, value)
-                            elif action_key.startswith("add_metadata"):
-                                a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
-                                if len(a) != 2:
-                                    print_error("Invalid value for action '{}' in PFMod rule '{}'.".format(action_key, rule_name))
-                                else:
-                                    key = a[0]
-                                    value = a[1]
-                                    if action_key.endswith("exclusive"):
-                                        self.delete_metadata(sid, key)
-                                    self.add_metadata(sid, key, value)
-                            elif action_key == "set_priority":
-                                print_debug("Setting priority on SID {}".format(sid))
-                                priority = str(action[action_key]).strip()
-                                if priority_keyword_re.search(self.metadata_dict[sid]['raw_rule']):
-                                    self.metadata_dict[sid]['raw_rule'] = priority_keyword_re.sub(r'\g<PRE>' + priority + ';', self.metadata_dict[sid]['raw_rule'])
-                                else:
-                                    # no 'priority' keyword in original rule; add one.
-                                    priority_string = " priority:{};)".format(priority)
-                                    self.metadata_dict[sid]['raw_rule'] = eol_re.sub(priority_string, self.metadata_dict[sid]['raw_rule'])
-                            elif action_key == "regex_sub":
-                                v = action[action_key]
-                                insensitive = False
-                                re_flag = 0
-                                re_v = v
-                                if v.endswith('i'):
-                                    insensitive = True
-                                    re_flag = re.I
-                                    re_v = v[:-1]
-                                try:
-                                    search_string,replace_string = re_v.strip().strip('/').split('/')
-                                    pattern_re = re.compile(r"{}".format(search_string), flags=re_flag)
-                                    self.metadata_dict[sid]['raw_rule'] = pattern_re.sub(r'{}'.format(replace_string), self.metadata_dict[sid]['raw_rule'])
-                                except Exception as e:
-                                    print_error("Problem processing '{}' value '{}' in PFMod rule named '{}': {}".format(action_key, v, rule_name, e))
-                                    continue
 
-                            else:
-                                #not reached
-                                print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict), fatal=True)
-                            #print_debug("Handled '{}' Action: '{}'. Value: '{}'".format(action_key, action, action[action_key]))
-                    else:
-                        print_error("Invalid action data type '{}' in PFMod rule named '{}'.".format(type(action), rule_name))
-                        continue
+        try:
+            if not os.path.isfile(pfmod_file):
+                print_error("Problem processing PFMod file '{}': file not found.".format(pfmod_file), fatal=True)
+            with open(pfmod_file, 'r') as fh:
+                pfmod_rules = yaml.safe_load(fh)
+        except Exception as e:
+            print_error("Unable to open PFMod YAML file '{}': {}".format(pfmod_file, e), fatal=True)
+
+        if "include" in pfmod_rules.keys():
+            # Note: allowing for include directives creates a directed graph but checking is not done
+            # to ensure it is acyclic.  We could check to ensure this is a DAG but for now, it's the
+            # responsibility of the user.
+            for f in pfmod_rules['include']:
+                if not os.path.isabs(f):
+                    f = os.path.join(os.path.dirname(pfmod_file), f)
+                matched_sids_all.update(self._pfmod_apply(f, sids))
+        elif "rules" not in pfmod_rules.keys():
+            print_error("No 'rules' directives defined in file '{}'.".format(pfmod_file), fatal=True)
+        if "version" in pfmod_rules.keys():
+            print_debug("Processing PFMod rules file '{}', version {}.".format(os.path.basename(pfmod_file), pfmod_rules['version']))
+        if "rules" in pfmod_rules.keys():
+            for rule in pfmod_rules['rules']:
+                rule_name = "<undefined>"
+                if "name" in rule.keys():
+                    rule_name = rule['name']
+                    print_debug("Processing PFMod rule '{}'".format(rule_name))
+                for k in ["filter_string", "actions"]:
+                    if k not in rule.keys():
+                        print_error("No '{}' defined for PFMod rule '{}'".format(k, rule_name), fatal=True)
+                #print_debug("Filter String: {}".format(rule['filter_string']))
+                try:
+                    matched_sids = self.filter_ruleset(rule['filter_string'])
+                except Exception as e:
+                    print_error("Unable to apply filter string '{}' in PFMod rule named '{}'.".format(rule['filter_string'], rule_name), fatal=True)
+                #print_debug("matched_sids: {}\npassed sids: {}".format(matched_sids, sids))
+                matched_sids = list(set(sids) & set(matched_sids))
+                matched_sids_all.update(matched_sids)
+                #print_debug("Matched sids: {}".format(matched_sids))
+                print_debug("Rule:\n\t{}\n\tModified: {}".format(rule_name, len(matched_sids)))
+                for sid in matched_sids:
+                    for action in rule['actions']:
+                        if type(action) == str:
+                            if action not in valid_actions_str:
+                                print_error("Invalid action '{}' in PFMod rule named '{}'. Supported str actions are: {}.".format(action, rule_name, valid_actions_str))
+                                continue
+                            if action != 'disable':
+                                print_error("Action not implemented: '{}'.".format(action))
+                                continue
+                            self.metadata_dict[sid]['disabled'] = True
+                        elif type(action) == dict:
+                            for action_key in action.keys():
+                                action_key = action_key.strip()
+                                if action_key not in valid_actions_dict:
+                                    print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict))
+                                    continue
+                                if len(str(action[action_key]).strip()) == 0:
+                                    print_error("No value for action '{}'.".format(action_key), fatal=True)
+                                if action_key == "delete_metadata":
+                                    a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
+                                    if len(a) < 2:
+                                        key = a[0]
+                                        print_debug("Deleting all metadata for key '{}'.".format(key))
+                                        self.delete_metadata(sid, key)
+                                    else:
+                                        key = a[0]
+                                        value = a[1]
+                                        print_debug("Deleting all metadata with key-value pair '{} {}'.".format(key, value))
+                                        self.delete_metadata(sid, key, value)
+                                elif action_key.startswith("add_metadata"):
+                                    a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
+                                    if len(a) != 2:
+                                        print_error("Invalid value for action '{}' in PFMod rule '{}'.".format(action_key, rule_name))
+                                    else:
+                                        key = a[0]
+                                        value = a[1]
+                                        if action_key.endswith("exclusive"):
+                                            self.delete_metadata(sid, key)
+                                        self.add_metadata(sid, key, value)
+                                elif action_key == "set_priority":
+                                    print_debug("Setting priority on SID {}".format(sid))
+                                    priority = str(action[action_key]).strip()
+                                    if priority_keyword_re.search(self.metadata_dict[sid]['raw_rule']):
+                                        self.metadata_dict[sid]['raw_rule'] = priority_keyword_re.sub(r'\g<PRE>' + priority + ';', self.metadata_dict[sid]['raw_rule'])
+                                    else:
+                                        # no 'priority' keyword in original rule; add one.
+                                        priority_string = " priority:{};)".format(priority)
+                                        self.metadata_dict[sid]['raw_rule'] = eol_re.sub(priority_string, self.metadata_dict[sid]['raw_rule'])
+                                elif action_key == "regex_sub":
+                                    v = action[action_key]
+                                    insensitive = False
+                                    re_flag = 0
+                                    re_v = v
+                                    if v.endswith('i'):
+                                        insensitive = True
+                                        re_flag = re.I
+                                        re_v = v[:-1]
+                                    try:
+                                        search_string,replace_string = re_v.strip().strip('/').split('/')
+                                        pattern_re = re.compile(r"{}".format(search_string), flags=re_flag)
+                                        self.metadata_dict[sid]['raw_rule'] = pattern_re.sub(r'{}'.format(replace_string), self.metadata_dict[sid]['raw_rule'])
+                                    except Exception as e:
+                                        print_error("Problem processing '{}' value '{}' in PFMod rule named '{}': {}".format(action_key, v, rule_name, e))
+                                        continue
+
+                                else:
+                                    #not reached
+                                    print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict), fatal=True)
+                                #print_debug("Handled '{}' Action: '{}'. Value: '{}'".format(action_key, action, action[action_key]))
+                        else:
+                            print_error("Invalid action data type '{}' in PFMod rule named '{}'.".format(type(action), rule_name))
+                            continue
         return matched_sids_all
 
     def print_header(self, sids=None):
@@ -1445,7 +1456,7 @@ def main():
 
     pfmod_sids = None
     if rs.pfmod_file:
-        pfmod_sids = rs._pfmod_apply(filtered_sids)
+        pfmod_sids = rs._pfmod_apply(rs.pfmod_file, filtered_sids)
         #print_debug("pfmod_sids: {}".format(pfmod_sids))
 
     # if stats requested, print out stats on filtered/modified ruleset

@@ -25,13 +25,23 @@ PFMod YAML format:
 
 -  The ``version`` key is optional and can be used (in the future) to distinguish among different
    PFMod format versions.  However, at this point there is only one version -- 1.0.
+-  The ``include`` key can be given a list of (other) PFMod rules files to include. Files are
+   processed in the order they appear with files in the ``include`` list being processed
+   before any ``rules`` directives in a file.  If an absolute path is not given, the location
+   of the referenced file will assume to be relative to the file in which it is referenced.
 -  Under the ``rules`` key is a list of (PFMod) rules each with its applicable data:
 
    -  ``name`` - optional but useful for a description of the rule, and used in error output.
-   -  ``filter_string`` - required;  the :doc:`Filter String <filter_strings>` to use against the (initially filtered)
+   -  ``filter_string`` - the :doc:`Filter String <filter_strings>` to use against the (initially filtered)
       ruleset whose results will be the object of the rule's actions.
-   -  ``actions`` - required;  a list of actions to perform on the rules that matched the filter string
+   -  ``actions`` - a list of actions to perform on the rules that matched the filter string
       in the rule.
+
+.. warning::
+     Using the ``include`` key to include files can create a cyclic situation if included files
+     include themselves or subsequent files include previous files.  Currently, no checking is
+     done to ensure the "includes" chain is a directed acyclic graph, so for now that responsibility
+     falls on the user.
 
 .. warning:: PFMod requires that the "modify" (``-m``) be set and will enable it, if not enabled,
      if a PFMod file is given.
@@ -68,8 +78,28 @@ Supported ``actions`` are:
     means that, depending on how the rules and actions are written, subsequent rules and actions can affect changes
     made by previous rules and actions.
 
-Example PFMod YAML File
------------------------
+Example PFMod YAML Files
+------------------------
+
+Example file using ``include`` to load multiple PFMod files:
+
+.. code-block:: yaml
+
+    %YAML 1.1
+    ---
+
+    # Created By George P. Burdell 2023-03-02
+    # Main includes file
+
+    version: "1.0"
+    includes:
+      - "pfmod-inbound.yaml"
+      - "pfmod-outbound.yaml"
+      - "pfmod-malware.yaml"
+
+
+Example file with ``rules`` specified.  Note: you can have a PFMod file with ``include`` and ``rules``; the former
+will be processed and then the latter.
 
 .. code-block:: yaml
 
