@@ -1140,7 +1140,7 @@ class Ruleset():
               " Total: {}; Enabled: {}; Disabled: {}".format(total, enabled, disabled) + \
               RESET + "\n")
 
-    def get_stats(self, key, keyonly=False, sids=None):
+    def get_stats(self, key, keyonly=False, sids=None, include_empty_substat=False):
         """Returns string of statistics (total, enabled, disabled) for specified key and its values.
 
         :param key: key to print statistics for
@@ -1149,6 +1149,8 @@ class Ruleset():
         :type keyonly: bool, optional
         :param sids: list of SIDs to consider. If not provided, global list is used.
         :type sids: list, optional
+        :param include_empty_substat: includes cases where substat (key-value pair) has zero results
+        :parap include_empty_substat: bool, optional
         :returns: string contaning stats, suitable for printing to stdout
         :rtype: string
         :raises: `AristotleException`
@@ -1178,7 +1180,8 @@ class Ruleset():
                     total = len([s for s in sids if s in self.keys_dict[key][value]])
                     enabled = len([sid for sid in self.keys_dict[key][value] if sid in sids and not self.metadata_dict[sid]['disabled']])
                 disabled = total - enabled
-                retstr += "\t{} (Total: {}; Enabled: {}; Disabled: {})\n".format(ORANGE + value + RESET, total, enabled, disabled)
+                if include_empty_substat or total > 0:
+                    retstr += "\t{} (Total: {}; Enabled: {}; Disabled: {})\n".format(ORANGE + value + RESET, total, enabled, disabled)
             retstr += "\n"
         return retstr
 
@@ -1193,9 +1196,14 @@ class Ruleset():
         :type sids: list, optional
         """
         stats_str = self.get_stats(key=key, keyonly=keyonly, sids=sids)
-        if stats_str[-1] == '\n':
-            stats_str = stats_str[:-1]
-        print("{}".format(stats_str))
+        if stats_str:
+            if stats_str[-1] == '\n':
+                stats_str = stats_str[:-1]
+            print("{}".format(stats_str))
+            return True
+        else:
+            print_warning("No statistics to print.")
+            return False
 
     def print_ruleset_summary(self, sids, pfmod_sids=None):
         """Prints summary/truncated filtered ruleset to stdout.
