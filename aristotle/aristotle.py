@@ -1110,7 +1110,7 @@ class Ruleset():
                                         re_flag = re.I
                                         re_v = v[:-1]
                                     try:
-                                        search_string, replace_string = re_v.strip().strip('/').split('/')
+                                        search_string, replace_string = re_v.strip().strip('/').split('/', 1)
                                         pattern_re = re.compile(r"{}".format(search_string), flags=re_flag)
                                         self.metadata_dict[sid]['raw_rule'] = pattern_re.sub(r'{}'.format(replace_string), self.metadata_dict[sid]['raw_rule'])
                                     except Exception as e:
