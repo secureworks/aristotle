@@ -32,8 +32,10 @@ import sys
 import traceback
 import yaml
 
+
 class AristotleException(Exception):
     pass
+
 
 # if used as library, attach to "aristotle",
 # e.g. logger = logging.getLogger("aristotle")
@@ -51,7 +53,11 @@ aristotle_logger = logging.getLogger("aristotle")
 if (sys.version_info < (3, 2)):
     aristotle_logger.addHandler(logging.NullHandler())
 
-rule_re = re.compile(r"^(?P<HEADER>(?P<ACTION>pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+(?P<PROTO>[^\s]+)\s+(?P<SRCIP>[^\s]+)\s+(?P<SRCPORT>[^\s]+)\s+(?P<DIRECTION>[\x2D\x3C]\x3E)\s+(?P<DSTIP>[^\s]+)\s+(?P<DSTPORT>[^\s]+))\s+\x28(?P<BODY>[^\x29]+)")
+rule_re = re.compile(
+    r"^(?P<HEADER>(?P<ACTION>pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+"
+    r"(?P<PROTO>[^\s]+)\s+(?P<SRCIP>[^\s]+)\s+(?P<SRCPORT>[^\s]+)\s+(?P<DIRECTION>[\x2D\x3C]\x3E)\s+(?P<DSTIP>[^\s]+)\s+(?P<DSTPORT>[^\s]+))\s+"
+    r"\x28(?P<BODY>[^\x29]+)"
+)
 disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B")
 sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
 metadata_keyword_re = re.compile(r"(?P<PRE>[\x28\x3B]\s*metadata\s*\x3A\s*)(?P<METADATA>[^\x3B]+)\x3B")
@@ -62,7 +68,7 @@ app_layer_protocol_re = re.compile(r"[\s\x3B\x28]app-layer-protocol\s*\x3A\s*(?P
 target_keyword_re = re.compile(r"[\x28\x3B]\s*target\s*\x3A\s*(?P<TARGET>[^\x3B]+)\x3B")
 rule_msg_re = re.compile(r"[\s\x3B\x28]msg\s*\x3A\s*\x22(?P<MSG>[^\x22]+?)\x22\s*\x3B")
 cve_re = re.compile(r"(?:19|20)\d{2}\x2D(?:0\d{3}|[1-9]\d{3,})")
-cve_re_broad = re.compile(r"\bcve\x2D\d{4}\x2D\d+\b",flags=re.I)
+cve_re_broad = re.compile(r"\bcve\x2D\d{4}\x2D\d+\b", flags=re.I)
 mitre_attack_url_re = re.compile(r"attack\x2Emitre\x2Eorg\x2F(?:techniques|datasources|groups|software|campaigns)\x2F(?:TA|DS|[TGSC])\d+(?:\x2F\d+)?")
 eol_re = re.compile(r"\x29\s*$")
 
@@ -95,6 +101,7 @@ else:
     BLUE = ""
     UNDERLINE = ""
 
+
 def print_error(msg, fatal=True):
     """Error reporting and logging to "aristotle" logger.
 
@@ -107,18 +114,21 @@ def print_error(msg, fatal=True):
     aristotle_logger.error(INVERSE + RED + "ERROR:" + RESET + RED + " {}".format(msg) + RESET)
     if fatal:
         aristotle_logger.critical(RED + "Cannot continue" + RESET)
-        if __name__== "__main__":
+        if __name__ == "__main__":
             sys.exit(1)
         else:
             raise AristotleException(msg)
+
 
 def print_debug(msg):
     """logging.debug output to "aristotle" logger."""
     aristotle_logger.debug(INVERSE + BLUE + "DEBUG:" + RESET + BLUE + " {}".format(msg) + RESET)
 
+
 def print_warning(msg):
     """logging.warning output to "aristotle" logger."""
     aristotle_logger.warning(INVERSE + YELLOW + "WARNING:" + RESET + YELLOW + " {}".format(msg) + RESET)
+
 
 class Ruleset():
     """Class for ruleset data structures, filter string, and ruleset operations.
@@ -150,7 +160,8 @@ class Ruleset():
     :type pfmod_file: string, optional
     :raises: `AristotleException`
     """
-    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False, summary_max=16, ignore_classtype_keyword=False, ignore_filename=False, normalize=False, enhance=False, modify_metadata=False, pfmod_file=None):
+    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False, summary_max=16, ignore_classtype_keyword=False,
+                 ignore_filename=False, normalize=False, enhance=False, modify_metadata=False, pfmod_file=None):
         """Constructor."""
         # dict keys are sids
         self.metadata_dict = {}
@@ -277,11 +288,11 @@ class Ruleset():
             ipval = ipval[1:-1]
         brackets = [c for c in ipval if c == '[']
         if len(brackets) > 0:
-            print_error("Double nested ipval found: {}.  Cannot reduce".format(original_ipval))
+            print_error("Double nested ipval found: {}.  Cannot reduce".format(original_val))
             return unknown
         ipval_list = [v.strip() for v in ipval.split(',')]
         reduced_ipval = self._reduce_ipval_helper(ipval_list, global_negate=negated)
-        #print_debug(" Original: {}\nProcessed: {}\n  Reduced: {}\n".format(original_val, ipval, reduced_ipval))
+        # print_debug(" Original: {}\nProcessed: {}\n  Reduced: {}\n".format(original_val, ipval, reduced_ipval))
         ipval_cache[original_val] = reduced_ipval
         return reduced_ipval
 
@@ -296,8 +307,8 @@ class Ruleset():
             :type global_negate: bool, optional
         """
         home_net_vars = ["$HOME_NET", "$DNS_SERVERS", "$HTTP_SERVERS", "$SMTP_SERVERS", "$SQL_SERVERS",
-                 "$TELNET_SERVERS", "$FTP_SERVERS", "$DNP3_CLIENT", "$DNP3_SERVER", "$ICCP_CLIENT",
-                 "$ICCP_SERVER", "$ENIP_CLIENT", "$ENIP_SERVER", "$MODBUS_CLIENT", "$MODBUS_SERVER"]
+                         "$TELNET_SERVERS", "$FTP_SERVERS", "$DNP3_CLIENT", "$DNP3_SERVER", "$ICCP_CLIENT",
+                         "$ICCP_SERVER", "$ENIP_CLIENT", "$ENIP_SERVER", "$MODBUS_CLIENT", "$MODBUS_SERVER"]
         external_net_vars = ["$EXTERNAL_NET", "$RFC1918", "$GOTOMYPC", "$AIM_SERVERS"]
         # add CGNAT?
         known_localnet_ips = ["10.0.0.0/8", "192.168.0.0/24", "172.16.0.0/12", "127.0.0.0/8", "255.255.255.255"]
@@ -435,10 +446,10 @@ class Ruleset():
                                         "ja3.hash", "ja3.string", "ftpdata_command", "krb5_cname",
                                         "sip.method", "sip.uri", "sip.request_line"]
                     response_keywords = ["http.stat_msg", "http_stat_msg", "http.stat_code", "http_stat_code",
-                                          "http.response_line", "http_response_line", "http.response_body",
-                                          "http_server_body", "http.server", "http.location", "ssh.hassh.server",
-                                          "ssh.hassh.server.string", "ja3s.hash", "ja3s.string", "krb5_sname",
-                                          "sip.stat_code", "sip.stat_msg", "sip.response_line"]
+                                         "http.response_line", "http_response_line", "http.response_body",
+                                         "http_server_body", "http.server", "http.location", "ssh.hassh.server",
+                                         "ssh.hassh.server.string", "ja3s.hash", "ja3s.string", "krb5_sname",
+                                         "sip.stat_code", "sip.stat_msg", "sip.response_line"]
                     matches = [k for k in keywords if k in request_keywords]
                     if len(matches) > 0:
                         self.add_metadata(sid, 'flow', 'to_server')
@@ -457,11 +468,11 @@ class Ruleset():
             sip_reduced = self.reduce_ipval(sip_val)
             dip_reduced = self.reduce_ipval(dip_val)
 
-            #print_debug("{}\n{}\n".format(sip_val, sip_reduced))
-            #print_debug("{}\n{}\n".format(dip_val, dip_reduced))
+            # print_debug("{}\n{}\n".format(sip_val, sip_reduced))
+            # print_debug("{}\n{}\n".format(dip_val, dip_reduced))
 
-            #self.metadata_dict[sid]['sip_reduced'] = sip_reduced
-            #self.metadata_dict[sid]['dip_reduced'] = dip_reduced
+            # self.metadata_dict[sid]['sip_reduced'] = sip_reduced
+            # self.metadata_dict[sid]['dip_reduced'] = dip_reduced
 
             # calculate detection direction; possible values:
             # inbound, inbound-notexclusive, outbound, outbound-notexclusive,
@@ -511,7 +522,7 @@ class Ruleset():
                 v = dateparse(v.replace('_', '-'))
                 v = v.strftime("%Y-%m-%d")
             except Exception as e:
-                print_warning("Unable to parse '{}' key with value '{}' as date.".format(k, v))
+                print_warning("Unable to parse '{}' key with value '{}' as date: {}".format(k, v, e))
             retlist.append([k, v])
         elif k == "cve":
             # ET ruleset will in some cases string together multiple CVEs in one
@@ -545,7 +556,7 @@ class Ruleset():
         # in filters) and strip leading and trailing whitespace.
         key = key.lower().strip()
         value = value.lower().strip()
-        if not sid in self.metadata_dict.keys():
+        if sid not in self.metadata_dict.keys():
             print_error("add_metadata() called for sid '{}' but sid is invalid (does not exist).".format(sid))
             return
         # populate metadata_dict
@@ -576,7 +587,7 @@ class Ruleset():
         key = key.lower().strip()
         if value:
             value = value.lower().strip()
-        if not sid in self.metadata_dict.keys():
+        if sid not in self.metadata_dict.keys():
             print_error("delete_metadata() called for sid '{}' but sid is invalid (does not exist).".format(sid))
             return
         if value is None:
@@ -597,7 +608,6 @@ class Ruleset():
                     if sid in self.keys_dict[key][value]:
                         self.keys_dict[key][value].remove(sid)
 
-
     def parse_rules(self, rules, filename=None):
         """Parses the given rules and builds/updates necessary data structures.
 
@@ -608,7 +618,7 @@ class Ruleset():
         """
         try:
             for lineno, line in enumerate(rules.splitlines()):
-             # ignore comments and blank lines
+                # ignore comments and blank lines
                 is_disabled_rule = False
                 if len(line.strip()) == 0:
                     continue
@@ -660,11 +670,11 @@ class Ruleset():
                     if is_disabled_rule:
                         continue
                 self.metadata_dict[sid] = {'metadata': {},
-                                      'msg': msg,
-                                      'disabled': False,
-                                      'default-disabled': False,
-                                      'raw_rule': line
-                                     }
+                                           'msg': msg,
+                                           'disabled': False,
+                                           'default-disabled': False,
+                                           'raw_rule': line
+                                           }
                 if is_disabled_rule:
                     self.metadata_dict[sid]['disabled'] = True
                     self.metadata_dict[sid]['default-disabled'] = True
@@ -701,7 +711,7 @@ class Ruleset():
                     else:
                         kvs = [kvsplit]
                     for current_kvp in kvs:
-                        k,v = current_kvp
+                        k, v = current_kvp
                         self.add_metadata(sid, k, v)
                     for k in self.metadata_dict[sid]['metadata'].keys():
                         # remove duplicate values for the same key
@@ -817,10 +827,10 @@ class Ruleset():
                     cmp_operator = v[:offset]
                     cve_val = v[offset:].strip()
                     print_debug("cmp_operator: {}, cve_val: {}".format(cmp_operator, cve_val))
-                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()] \
-                                  for val in self.metadata_dict[s]["metadata"][k] \
-                                    if self.cve_compare(left_val=val, right_val=cve_val, cmp_operator=cmp_operator) and \
-                                    (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
+                                for val in self.metadata_dict[s]["metadata"][k]
+                                if self.cve_compare(left_val=val, right_val=cve_val, cmp_operator=cmp_operator)
+                                and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 except Exception as e:
                     print_error("Unable to process key '{}' value '{}' (as CVE number):\n{}".format(k, v, e), fatal=True)
             elif k in ["created_at", "updated_at"]:
@@ -834,16 +844,16 @@ class Ruleset():
                             offset += 1
                         ubound = dateparse(v[offset:].strip())
                         ubound += datetime.timedelta(microseconds=(offset - 1))
-                    else: # v.startswith('>'):
+                    else:  # v.startswith('>'):
                         if v[offset] == '=':
                             offset += 1
                         lbound = dateparse(v[offset:].strip())
                         lbound -= datetime.timedelta(microseconds=(offset - 1))
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
-                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()] \
-                                  for val in self.metadata_dict[s]["metadata"][k] \
-                                    if (dateparse(val) < ubound and dateparse(val) > lbound) and \
-                                    (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
+                                for val in self.metadata_dict[s]["metadata"][k]
+                                if (dateparse(val) < ubound and dateparse(val) > lbound)
+                                and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 except Exception as e:
                     print_error("Unable to process '{}' value '{}' (as datetime):\n{}".format(k, v, e), fatal=True)
             else:
@@ -857,27 +867,25 @@ class Ruleset():
                             offset += 1
                         ubound = float(v[offset:].strip())
                         ubound += (float(offset) - 1.0)
-                    else: # v.startswith('>'):
+                    else:  # v.startswith('>'):
                         if v[offset] == '=':
                             offset += 1
                         lbound = float(v[offset:].strip())
                         lbound -= (float(offset) - 1.0)
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
-                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()] \
-                                  for val in self.metadata_dict[s]["metadata"][k] \
-                                    if (float(val) < float(ubound) and float(val) > float(lbound)) and \
-                                    (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
+                                for val in self.metadata_dict[s]["metadata"][k]
+                                if (float(val) < float(ubound) and float(val) > float(lbound))
+                                and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
                 except Exception as e:
                     print_error("Unable to process '{}' value '{}' (as float):\n{}".format(k, v, e), fatal=True)
         elif k in ["msg_regex", "rule_regex"]:
             # apply regex pattern to rule msg field
             if not (v.startswith('/') or v.endswith('.') or v.endswith("/i")):
                 print_error("Bad {} pattern '{}' in filter string. Pattern must start with '/' and end with '/' or '/i'.".format(k, v), fatal=True)
-            insensitive = False
             re_flag = 0
             re_v = v
             if v.endswith('i'):
-                insensitive = True
                 re_flag = re.I
                 re_v = v[:-1]
             re_v = re_v.strip('/')
@@ -1001,8 +1009,8 @@ class Ruleset():
                               "delete_metadata",
                               "set_priority",
                               "regex_sub"
-                             ]
-        valid_actions = valid_actions_str + valid_actions_dict
+                              ]
+        # valid_actions = valid_actions_str + valid_actions_dict
         matched_sids_all = set()
 
         print_debug("pfmod_apply() called")
@@ -1036,15 +1044,15 @@ class Ruleset():
                 for k in ["filter_string", "actions"]:
                     if k not in rule.keys():
                         print_error("No '{}' defined for PFMod rule '{}'".format(k, rule_name), fatal=True)
-                #print_debug("Filter String: {}".format(rule['filter_string']))
+                # print_debug("Filter String: {}".format(rule['filter_string']))
                 try:
                     matched_sids = self.filter_ruleset(rule['filter_string'])
                 except Exception as e:
-                    print_error("Unable to apply filter string '{}' in PFMod rule named '{}'.".format(rule['filter_string'], rule_name), fatal=True)
-                #print_debug("matched_sids: {}\npassed sids: {}".format(matched_sids, sids))
+                    print_error("Unable to apply filter string '{}' in PFMod rule named '{}': {}.".format(rule['filter_string'], rule_name, e), fatal=True)
+                # print_debug("matched_sids: {}\npassed sids: {}".format(matched_sids, sids))
                 matched_sids = list(set(sids) & set(matched_sids))
                 matched_sids_all.update(matched_sids)
-                #print_debug("Matched sids: {}".format(matched_sids))
+                # print_debug("Matched sids: {}".format(matched_sids))
                 print_debug("Rule:\n\t{}\n\tModified: {}".format(rule_name, len(matched_sids)))
                 for sid in matched_sids:
                     for action in rule['actions']:
@@ -1096,15 +1104,13 @@ class Ruleset():
                                         self.metadata_dict[sid]['raw_rule'] = eol_re.sub(priority_string, self.metadata_dict[sid]['raw_rule'])
                                 elif action_key == "regex_sub":
                                     v = action[action_key]
-                                    insensitive = False
                                     re_flag = 0
                                     re_v = v
                                     if v.endswith('i'):
-                                        insensitive = True
                                         re_flag = re.I
                                         re_v = v[:-1]
                                     try:
-                                        search_string,replace_string = re_v.strip().strip('/').split('/')
+                                        search_string, replace_string = re_v.strip().strip('/').split('/')
                                         pattern_re = re.compile(r"{}".format(search_string), flags=re_flag)
                                         self.metadata_dict[sid]['raw_rule'] = pattern_re.sub(r'{}'.format(replace_string), self.metadata_dict[sid]['raw_rule'])
                                     except Exception as e:
@@ -1112,9 +1118,9 @@ class Ruleset():
                                         continue
 
                                 else:
-                                    #not reached
+                                    # not reached
                                     print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict), fatal=True)
-                                #print_debug("Handled '{}' Action: '{}'. Value: '{}'".format(action_key, action, action[action_key]))
+                                # print_debug("Handled '{}' Action: '{}'. Value: '{}'".format(action_key, action, action[action_key]))
                         else:
                             print_error("Invalid action data type '{}' in PFMod rule named '{}'.".format(type(action), rule_name))
                             continue
@@ -1129,16 +1135,16 @@ class Ruleset():
         if sids is None:
             sids = list(self.metadata_dict.keys())
         total = len(sids)
-        enabled = len([sid for sid in sids \
-                    if not self.metadata_dict[sid]['disabled']])
+        enabled = len([sid for sid in sids
+                       if not self.metadata_dict[sid]['disabled']])
         disabled = total - enabled
-        print("\n" + INVERSE + BROWN + "       Aristotle       " + \
-              RESET + BROWN + \
-              "\n Ruleset Metadata Tool " + RESET + "\n")
-        print(UNDERLINE + BOLD + GREEN + "All Rules:" + \
-              RESET + GREEN + \
-              " Total: {}; Enabled: {}; Disabled: {}".format(total, enabled, disabled) + \
-              RESET + "\n")
+        print("\n" + INVERSE + BROWN + "       Aristotle       "
+              + RESET + BROWN
+              + "\n Ruleset Metadata Tool " + RESET + "\n")
+        print(UNDERLINE + BOLD + GREEN + "All Rules:"
+              + RESET + GREEN
+              + " Total: {}; Enabled: {}; Disabled: {}".format(total, enabled, disabled)
+              + RESET + "\n")
 
     def get_stats(self, key, keyonly=False, sids=None, include_empty_substat=False):
         """Returns string of statistics (total, enabled, disabled) for specified key and its values.
@@ -1162,11 +1168,11 @@ class Ruleset():
         if key not in self.keys_dict.keys():
             print_warning("key '{}' not found".format(key))
             return
-        total = len([sid for sid in sids \
+        total = len([sid for sid in sids
                      if key in self.metadata_dict[sid]['metadata'].keys()])
-        enabled = len([sid for sid in sids \
-                     if key in self.metadata_dict[sid]['metadata'].keys() \
-                     and not self.metadata_dict[sid]['disabled']])
+        enabled = len([sid for sid in sids
+                       if key in self.metadata_dict[sid]['metadata'].keys()
+                       and not self.metadata_dict[sid]['disabled']])
         disabled = total - enabled
         retstr += "{} (Total: {}; Enabled: {}; Disabled: {})\n".format(REDISH + UNDERLINE + BOLD + key + RESET, total, enabled, disabled)
 
@@ -1311,7 +1317,7 @@ python3 aristotle/aristotle.py -r examples/example.rules --summary -n
 -f '(("priority high" AND "malware <ALL>") AND "created_at >= 2018-01-01")
 AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 80181444"'
 """ + "\r\n"
-            )
+        )
         parser.add_argument("-r", "--rules", "--ruleset",
                             action="store",
                             dest="rules",
@@ -1321,7 +1327,7 @@ AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 801814
                             action="store",
                             dest="metadata_filter",
                             required=False,
-                            default = None,
+                            default=None,
                             help="Boolean filter string or path to a file containing it")
         parser.add_argument("--summary",
                             action="store",
@@ -1329,7 +1335,7 @@ AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 801814
                             required=False,
                             type=int,
                             nargs='?',
-                            default = -1,
+                            default=-1,
                             help="output a summary of the filtered ruleset to stdout, limited \
                                   to DISPLAY_MAX number of lines (or 16 if no value given); \
                                   if the option to output to a file is set, the full, filtered ruleset \
@@ -1360,7 +1366,9 @@ AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 801814
                             dest="normalize",
                             required=False,
                             default=False,
-                            help="try to convert date and cve related metadata values to conform to the BETTER schema for filtering and statistics.  Dates are normalized to the format YYYY-MM-DD and CVEs to YYYY-<num>.  Also, 'sid' is removed from the metadata.")
+                            help="try to convert date and cve related metadata values to conform to the \
+                                  BETTER schema for filtering and statistics.  Dates are normalized to the \
+                                  format YYYY-MM-DD and CVEs to YYYY-<num>.  Also, 'sid' is removed from the metadata.")
         parser.add_argument("-e", "--enhance",
                             action="store_true",
                             dest="enhance",
@@ -1423,8 +1431,6 @@ def main():
     except Exception as e:
         print_error("Problem parsing command line args: {}".format(e), fatal=True)
 
-
-
     if args.debug:
         aristotle_logger.setLevel(logging.DEBUG)
     elif args.suppress_warnings:
@@ -1460,12 +1466,12 @@ def main():
         filtered_sids = rs.filter_ruleset()
     else:
         filtered_sids = [s for s in rs.metadata_dict.keys()]
-    #print_debug("filtered_sids: {}".format(filtered_sids))
+    # print_debug("filtered_sids: {}".format(filtered_sids))
 
     pfmod_sids = None
     if rs.pfmod_file:
         pfmod_sids = rs._pfmod_apply(rs.pfmod_file, filtered_sids)
-        #print_debug("pfmod_sids: {}".format(pfmod_sids))
+        # print_debug("pfmod_sids: {}".format(pfmod_sids))
 
     # if stats requested, print out stats on filtered/modified ruleset
     if args.stats is not None:
@@ -1495,6 +1501,6 @@ def main():
             rs.print_ruleset_summary(filtered_sids, pfmod_sids)
         rs.output_rules(sid_list=filtered_sids, outfile=args.outfile, modify_metadata=args.modify_metadata)
 
-if __name__== "__main__":
-    main()
 
+if __name__ == "__main__":
+    main()
