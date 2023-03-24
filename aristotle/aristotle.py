@@ -497,12 +497,10 @@ class Ruleset():
             else:
                 detection_direction = "unknown"
             self.add_metadata(sid, 'detection_direction', detection_direction)
-
-            #
         # TODO: remove duplicates?
         return
 
-    def normalize_better(self, k, v):
+    def normalize_better(self, k, v, sid=None):
         """ Try to convert date and cve related metadata values to conform to the
             BETTER schema for filtering and statistics. Currently applies to keys
             'cve', 'mitre_tactic_id', 'mitre_technique_id' and those ending with '_at' or "-at".
@@ -511,6 +509,8 @@ class Ruleset():
             :type k: string, required
             :param v: value of a metadata key-value pair
             :type v: string, required
+            :param sid: SID related to the passed in key-value pair. Used only for enriching logging.
+            :type sid: int, optional
 
             :returns: list of all key/value pairs to add to metadata structure
             :rtype: list
@@ -522,7 +522,7 @@ class Ruleset():
                 v = dateparse(v.replace('_', '-'))
                 v = v.strftime("%Y-%m-%d")
             except Exception as e:
-                print_warning("Unable to parse '{}' key with value '{}' as date: {}".format(k, v, e))
+                print_warning("Unable to parse metadata '{}' key with value '{}' as date{}: {}".format(k, v, " for sid {}".format(sid) if sid is not None else "", e))
             retlist.append([k, v])
         elif k == "cve":
             # ET ruleset will in some cases string together multiple CVEs in one
@@ -530,7 +530,7 @@ class Ruleset():
             # the other underscore nonsense.
             cves = cve_re.findall(v.replace('_', '-'))
             if len(cves) == 0:
-                print_warning("Unable to parse '{}' value '{}'".format(k, v))
+                print_warning("Unable to parse metadata '{}' key with value '{}'{}".format(k, v, " for sid {}".format(sid) if sid is not None else ""))
             for cve in cves:
                 retlist.append([k, cve])
         elif k in ['mitre_technique_id', 'mitre_tactic_id']:
@@ -707,7 +707,7 @@ class Ruleset():
                     # Because of that, make everything a(nother) list, even though most of the time it will be
                     # a one element list
                     if self.normalize:
-                        kvs = self.normalize_better(k, v)
+                        kvs = self.normalize_better(k, v, sid)
                     else:
                         kvs = [kvsplit]
                     for current_kvp in kvs:
@@ -1096,6 +1096,12 @@ class Ruleset():
                                 elif action_key == "set_priority":
                                     print_debug("Setting priority on SID {}".format(sid))
                                     priority = str(action[action_key]).strip()
+                                    try:
+                                        priority = int(priority)
+                                        if priority < 1 or priority > 255:
+                                            raise ValueError
+                                    except ValueError:
+                                        print_error("Invalid 'set_priority' value '{}' in PFMod rule named '{}': value must be integer in range 1-255.".format(priority, rule_name), fatal=True)
                                     if priority_keyword_re.search(self.metadata_dict[sid]['raw_rule']):
                                         self.metadata_dict[sid]['raw_rule'] = priority_keyword_re.sub(r'\g<PRE>' + priority + ';', self.metadata_dict[sid]['raw_rule'])
                                     else:
