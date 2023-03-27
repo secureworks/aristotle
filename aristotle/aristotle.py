@@ -1022,6 +1022,8 @@ class Ruleset():
                 pfmod_rules = yaml.safe_load(fh)
         except Exception as e:
             print_error("Unable to open PFMod YAML file '{}': {}".format(pfmod_file, e), fatal=True)
+        if not type(pfmod_rules) == dict:
+            print_error("Unexpected YAML format in file '{}'. Cannot continue.".format(pfmod_file), fatal=True)
 
         if "include" in pfmod_rules.keys():
             # Note: allowing for include directives creates a directed graph but checking is not done
@@ -1103,7 +1105,7 @@ class Ruleset():
                                     except ValueError:
                                         print_error("Invalid 'set_priority' value '{}' in PFMod rule named '{}': value must be integer in range 1-255.".format(priority, rule_name), fatal=True)
                                     if priority_keyword_re.search(self.metadata_dict[sid]['raw_rule']):
-                                        self.metadata_dict[sid]['raw_rule'] = priority_keyword_re.sub(r'\g<PRE>' + priority + ';', self.metadata_dict[sid]['raw_rule'])
+                                        self.metadata_dict[sid]['raw_rule'] = priority_keyword_re.sub(r'\g<PRE>' + str(priority) + ';', self.metadata_dict[sid]['raw_rule'])
                                     else:
                                         # no 'priority' keyword in original rule; add one.
                                         priority_string = " priority:{};)".format(priority)
