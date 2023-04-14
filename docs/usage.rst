@@ -258,12 +258,12 @@ The enhance command line option (also supported in
 the :ref:`Ruleset class constructor <target Ruleset class>` will analyze the rule(s) and attempt
 to update the metadata on each.
 
-  - ``flow`` key with values normalized to be ``to_sever``   ` or ``to_client``.
+  - ``flow`` key with values normalized to be ``to_sever`` or ``to_client``.
   - ``protocols`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
   - ``cve`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
-    The value(s) are based on data exracted from the raw rule, e.g. ``msg`` field, ``reference`` keyword, etc.
+    The value(s) are based on data extracted from the raw rule, e.g. ``msg`` field, ``reference`` keyword, etc.
   - ``mitre_attack`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
-    The value(s) are based on data exracted from the rule's ``reference`` keyword.
+    The value(s) are based on data extracted from the rule's ``reference`` keyword.
   - ``hostile`` key and applicable values (``dest_ip`` or ``src_ip``, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
     The values are the inverse of values taken from the ``target`` keyword.
   - ``classtype``\* key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.

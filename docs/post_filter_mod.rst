@@ -60,8 +60,8 @@ Supported ``actions`` are:
 -  ``delete_metadata`` - if a key-value pair is given (e.g. ``former_category malware``) remove the key-value pair
    from the rule.  If just a key name is given (e.g. ``former_category``), remove all metadata using the given key,
    regardless of the value.
--  ``set_priority`` -- set the priority tag in the rule to have the given value.  If the rule does not contain
-   a priority keyword, add it and set the value to the given value.
+-  ``set_priority`` -- set the ``priority`` keyword in the rule to have the given value.  If the rule does not contain
+   a ``priority`` keyword, add it and set the value to the given value.
 -  ``regex_sub`` -- Perform a RegEx find and replace on the rule based on the given value. Details:
 
     -  Values follow the format ``/regex-to-find/replacement_string/i``

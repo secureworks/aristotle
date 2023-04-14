@@ -83,7 +83,7 @@ Filter string key-value pair                   Functional Python equivalent
 Matching on the raw rule
 ------------------------
 A filter string supports the filtering of rules based on a regular expression
-pattern applied against the full raw rule..  To specify such a filter, use
+pattern applied against the full raw rule.  To specify such a filter, use
 the (pseudo) key ``rule_regex`` with the pattern as the value. This behaves
 the same way and follows the same rules as the ``msg_regex`` pseudo keyword
 (except for the data it matches against).  See the :ref:`Matching on the msg Field` section.
