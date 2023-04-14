@@ -258,7 +258,7 @@ The enhance command line option (also supported in
 the :ref:`Ruleset class constructor <target Ruleset class>` will analyze the rule(s) and attempt
 to update the metadata on each.
 
-  - ``flow`` key with values normalized to be ``to_sever`` or ``to_client``.
+  - ``flow`` key with values normalized to be ``to_server`` or ``to_client``.
   - ``protocols`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
   - ``cve`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
     The value(s) are based on data extracted from the raw rule, e.g. ``msg`` field, ``reference`` keyword, etc.
