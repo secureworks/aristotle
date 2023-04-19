@@ -52,6 +52,13 @@ and value:
 -  ``cvss_v3_temporal``
 -  ``created_at``
 -  ``updated_at``
+-  ``risk_score``
+
+.. note::
+    The metadata key ``risk_score``, although not explicitly defined by v1.0 of
+    the `BETTER Schema <https://better-schema.readthedocs.io/>`__,
+    is assumed to have a numeric value.  Aristotle will throw
+    an error if the ``risk_score`` key is used and the value cannot be converted to a float.
 
 Matching on the msg Field
 -------------------------

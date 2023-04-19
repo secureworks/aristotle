@@ -814,7 +814,8 @@ class Ruleset():
                      'cvss_v3_base',
                      'cvss_v3_temporal',
                      'created_at',
-                     'updated_at']
+                     'updated_at',
+                     'risk_score']
         if k in rangekeys and (v.startswith('<') or v.startswith('>')) and v not in ["<all>", "<any>"]:
             if len(v) < 2:
                 print_error("Invalid value '{}' for key '{}'.".format(v, k), fatal=True)
