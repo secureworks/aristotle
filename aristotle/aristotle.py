@@ -58,7 +58,7 @@ rule_re = re.compile(
     r"(?P<PROTO>[^\s]+)\s+(?P<SRCIP>[^\s]+)\s+(?P<SRCPORT>[^\s]+)\s+(?P<DIRECTION>[\x2D\x3C]\x3E)\s+(?P<DSTIP>[^\s]+)\s+(?P<DSTPORT>[^\s]+))\s+"
     r"\x28(?P<BODY>[^\x29]+)"
 )
-disabled_rule_re = re.compile(r"^\x23(?:pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B")
+disabled_rule_re = re.compile(r"^\x23\s*(?:pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B")
 sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
 metadata_keyword_re = re.compile(r"(?P<PRE>[\x28\x3B]\s*metadata\s*\x3A\s*)(?P<METADATA>[^\x3B]+)\x3B")
 classtype_keyword_re = re.compile(r"[\x28\x3B]\s*classtype\s*\x3A\s*(?P<CLASSTYPE>[^\x3B]+)\x3B")
@@ -625,7 +625,7 @@ class Ruleset():
                 if line.lstrip().startswith('#'):
                     if disabled_rule_re.match(line):
                         is_disabled_rule = True
-                        line = line[1:]
+                        line = line[1:].strip()
                     else:
                         # valid comment (not disabled rule)
                         print_debug("Skipping comment: {}".format(line))
@@ -666,18 +666,23 @@ class Ruleset():
 
                 # build dict
                 if sid in self.metadata_dict.keys():
-                    print_warning("Duplicate sid '{}' found{} Only the latest enabled one will be included.".format(sid, "!" if not filename else " in file '{}'!".format(filename)))
+                    # include the first encountered enabled rule; if they are all disabled, include the first encountered.
+                    print_warning("Duplicate sid '{}' found{}".format(sid, "!" if not filename else " in file '{}'!".format(filename)))
                     if is_disabled_rule:
+                        print_warning("Ignoring disabled rule with duplicate sid: {}".format(line))
                         continue
+                    if self.metadata_dict[sid]['disabled']:
+                        print_warning("Ignoring disabled rule with duplicate sid: {}".format(self.metadata_dict[sid]['raw_rule']))
+                    else:
+                        print_warning("Ignoring rule with duplicate sid: {}".format(line))
+                        continue
+
                 self.metadata_dict[sid] = {'metadata': {},
                                            'msg': msg,
-                                           'disabled': False,
-                                           'default-disabled': False,
+                                           'disabled': False if self.include_disabled_rules else is_disabled_rule,
+                                           'originally-disabled': is_disabled_rule,
                                            'raw_rule': line
                                            }
-                if is_disabled_rule:
-                    self.metadata_dict[sid]['disabled'] = True
-                    self.metadata_dict[sid]['default-disabled'] = True
 
                 metadata_pairs = []
 
@@ -723,6 +728,15 @@ class Ruleset():
                     # be cast as str when used the same way other keys and values are used.
                     self.metadata_dict[sid]['metadata']['sid'] = [str(sid)]
                     self.keys_dict['sid'][str(sid)] = [sid]
+
+                # add 'originally_disabled' as pseudo metadata key so it can be filtered on
+                if 'originally_disabled' in self.metadata_dict[sid]['metadata'].keys():
+                    print_warning("Metadata key 'originally_disabled' found in SID {}. "
+                                  "This is an internal metadata key used by Aristotle. "
+                                  "The value '{}' found in the rule will be ignored.".format(sid, self.metadata_dict[sid]['metadata']['originally_disabled']))
+                    self.delete_metadata(sid, 'originally_disabled')
+                self.add_metadata(sid, 'originally_disabled', str(self.metadata_dict[sid]['originally-disabled']))
+
         except Exception as e:
             traceback.print_exc(e)
             print_error("Problem loading rules: {}".format(e), fatal=True)
@@ -1004,7 +1018,7 @@ class Ruleset():
         :rtype: list
         """
         # see docs
-        valid_actions_str = ["disable"]
+        valid_actions_str = ["disable", "enable"]
         valid_actions_dict = ["add_metadata",
                               "add_metadata_exclusive",
                               "delete_metadata",
@@ -1063,10 +1077,13 @@ class Ruleset():
                             if action not in valid_actions_str:
                                 print_error("Invalid action '{}' in PFMod rule named '{}'. Supported str actions are: {}.".format(action, rule_name, valid_actions_str))
                                 continue
-                            if action != 'disable':
+                            if action == 'disable':
+                                self.metadata_dict[sid]['disabled'] = True
+                            elif action == 'enable':
+                                self.metadata_dict[sid]['disabled'] = False
+                            else:
                                 print_error("Action not implemented: '{}'.".format(action))
                                 continue
-                            self.metadata_dict[sid]['disabled'] = True
                         elif type(action) == dict:
                             for action_key in action.keys():
                                 action_key = action_key.strip()
