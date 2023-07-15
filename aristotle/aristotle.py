@@ -58,7 +58,7 @@ rule_re = re.compile(
     r"(?P<PROTO>[^\s]+)\s+(?P<SRCIP>[^\s]+)\s+(?P<SRCPORT>[^\s]+)\s+(?P<DIRECTION>[\x2D\x3C]\x3E)\s+(?P<DSTIP>[^\s]+)\s+(?P<DSTPORT>[^\s]+))\s+"
     r"\x28(?P<BODY>[^\x29]+)"
 )
-disabled_rule_re = re.compile(r"^\x23\s*(?:pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B")
+disabled_rule_re = re.compile(r"^\x23\s*(?:pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B.*\x29$")
 sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
 metadata_keyword_re = re.compile(r"(?P<PRE>[\x28\x3B]\s*metadata\s*\x3A\s*)(?P<METADATA>[^\x3B]+)\x3B")
 classtype_keyword_re = re.compile(r"[\x28\x3B]\s*classtype\s*\x3A\s*(?P<CLASSTYPE>[^\x3B]+)\x3B")
@@ -140,27 +140,29 @@ class Ruleset():
         Boolean logic, and uses the metadata key-value pairs as values in the
         Boolean algebra. Defaults to None (can be set later with ``set_metadata_filter()``).
     :type metadata_filter: string, optional
-    :param include_disabled_rules: effectively enable all commented out rules when dealing with the ruleset, defaults to `False`
-    :type include_disabled_rules: bool, optional
+    :param enable_all_rules: enable all valid rules, including those disabled/commented out in the given rules file(s), when applying the filter; defaults to `False`
+    :type enable_all_rules: bool, optional
     :param summary_max: the maximum number of rules to print when outputting summary/truncated filtered ruleset, defaults to `16`.
     :type summary_max: int, optional
+    :param output_disabled_rules: include disabled rules in the output as commented out lines, defaults to `False`
+    :type output_disabled_rules: bool, optional
     :param ignore_classtype_keyword: don't incorporate the 'classtype' keyword and value into the
         metadata structure for filtering and reporting
     :type ignore_classtype_keyword: bool, optional
     :param ignore_filename: don't incorporate the filename of the rules file into the metadata structure for filtering and reporting
     :type ignore_filename: bool, optional
     :param normalize: try to convert and normalize date and CVE related metadata values into the schema defined by BETTER.
-        Dates are normalized to the format YYYY-MM-DD and CVEs to YYYY-<num>.  Also, 'sid' is removed from the metadata.
+        Dates are normalized to the format YYYY-MM-DD and CVEs to YYYY-<num>.  Also, 'sid' is removed from the metadata. Defaults to `False`
     :type normalize: bool, optional
-    :param enhance: enhance metadata by adding additional key-value pairs based on the rules
+    :param enhance: enhance metadata by adding additional key-value pairs based on the rules, defaults to `False`
     :type enhance: bool, optional
-    :param modify_metadata: modify the rule metadata keyword value on output to contain the internally tracked and normalized metadata data.
+    :param modify_metadata: modify the rule metadata keyword value on output to contain the internally tracked and normalized metadata data, defaults to `False`
     :type modify_metadata: bool, optional
     :param pfmod_file: A filename of a YAML file of directives to apply actions on post-filtered rules based on filter strings.
     :type pfmod_file: string, optional
     :raises: `AristotleException`
     """
-    def __init__(self, rules, metadata_filter=None, include_disabled_rules=False, summary_max=16, ignore_classtype_keyword=False,
+    def __init__(self, rules, metadata_filter=None, enable_all_rules=False, summary_max=16, output_disabled_rules=False, ignore_classtype_keyword=False,
                  ignore_filename=False, normalize=False, enhance=False, modify_metadata=False, pfmod_file=None):
         """Constructor."""
         # dict keys are sids
@@ -170,7 +172,8 @@ class Ruleset():
         # dict keys are hash of key-value pairs from passed in filter string/file
         self.metadata_map = {}
 
-        self.include_disabled_rules = include_disabled_rules
+        self.enable_all_rules = enable_all_rules
+        self.output_disabled_rules = output_disabled_rules
         self.ignore_classtype_keyword = ignore_classtype_keyword
         self.ignore_filename = ignore_filename
         self.normalize = normalize
@@ -239,7 +242,7 @@ class Ruleset():
                         # check for "<enable-all-rules>" directive that enables all rules
                         if line.lstrip().lower().startswith("<enable-all-rules>"):
                             print_debug("Enabling all rules.")
-                            self.include_disabled_rules = True
+                            self.enable_all_rules = True
                             line = line[len("<enable-all-rules>"):].lstrip()
                         # strip out comments and ignore blank lines
                         if line.strip().startswith('#') or len(line.strip()) == 0:
@@ -623,9 +626,9 @@ class Ruleset():
                 if len(line.strip()) == 0:
                     continue
                 if line.lstrip().startswith('#'):
-                    if disabled_rule_re.match(line):
+                    if disabled_rule_re.match(line.strip()):
                         is_disabled_rule = True
-                        line = line[1:].strip()
+                        line = line.lstrip()[1:].strip()
                     else:
                         # valid comment (not disabled rule)
                         print_debug("Skipping comment: {}".format(line))
@@ -679,8 +682,8 @@ class Ruleset():
 
                 self.metadata_dict[sid] = {'metadata': {},
                                            'msg': msg,
-                                           'disabled': False if self.include_disabled_rules else is_disabled_rule,
-                                           'originally-disabled': is_disabled_rule,
+                                           'disabled': False if self.enable_all_rules else is_disabled_rule,
+                                           'originally_disabled': is_disabled_rule,
                                            'raw_rule': line
                                            }
 
@@ -735,7 +738,7 @@ class Ruleset():
                                   "This is an internal metadata key used by Aristotle. "
                                   "The value '{}' found in the rule will be ignored.".format(sid, self.metadata_dict[sid]['metadata']['originally_disabled']))
                     self.delete_metadata(sid, 'originally_disabled')
-                self.add_metadata(sid, 'originally_disabled', str(self.metadata_dict[sid]['originally-disabled']))
+                self.add_metadata(sid, 'originally_disabled', str(self.metadata_dict[sid]['originally_disabled']))
 
         except Exception as e:
             traceback.print_exc(e)
@@ -796,16 +799,28 @@ class Ruleset():
             print_error("Unable to do CVE comparison '{} {} {}':\n{}".format(left_val, cmp_operator, right_val, e), fatal=True)
 
     def get_all_sids(self):
-        """Returns a list of all enabled SIDs.
+        """Returns a list of all SIDs, enabled and disabled.
 
-        .. note::
-            If ``self.include_disabled_rules`` is True, then
-            all SIDs are returned.
+        :returns: list of all enabled SIDs, enabled and disabled.
+        :rtype: list
+        """
+        return [s for s in self.metadata_dict.keys()]
+
+    def get_enabled_sids(self):
+        """Returns a list of all enabled SIDs.
 
         :returns: list of all enabled SIDs.
         :rtype: list
         """
-        return [s for s in self.metadata_dict.keys() if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+        return [s for s in self.metadata_dict.keys() if not self.metadata_dict[s]['disabled']]
+
+    def get_disabled_sids(self):
+        """Returns a list of all disabled SIDs.
+
+        :returns: list of all disabled SIDs.
+        :rtype: list
+        """
+        return [s for s in self.metadata_dict.keys() if self.metadata_dict[s]['disabled']]
 
     def get_sids(self, kvpair, negate=False):
         """Get a list of all SIDs for passed in key-value pair.
@@ -844,8 +859,7 @@ class Ruleset():
                     print_debug("cmp_operator: {}, cve_val: {}".format(cmp_operator, cve_val))
                     retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
                                 for val in self.metadata_dict[s]["metadata"][k]
-                                if self.cve_compare(left_val=val, right_val=cve_val, cmp_operator=cmp_operator)
-                                and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                                if self.cve_compare(left_val=val, right_val=cve_val, cmp_operator=cmp_operator)]
                 except Exception as e:
                     print_error("Unable to process key '{}' value '{}' (as CVE number):\n{}".format(k, v, e), fatal=True)
             elif k in ["created_at", "updated_at"]:
@@ -867,8 +881,7 @@ class Ruleset():
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
                     retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
                                 for val in self.metadata_dict[s]["metadata"][k]
-                                if (dateparse(val) < ubound and dateparse(val) > lbound)
-                                and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                                if (dateparse(val) < ubound and dateparse(val) > lbound)]
                 except Exception as e:
                     print_error("Unable to process '{}' value '{}' (as datetime):\n{}".format(k, v, e), fatal=True)
             else:
@@ -890,8 +903,7 @@ class Ruleset():
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
                     retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
                                 for val in self.metadata_dict[s]["metadata"][k]
-                                if (float(val) < float(ubound) and float(val) > float(lbound))
-                                and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                                if (float(val) < float(ubound) and float(val) > float(lbound))]
                 except Exception as e:
                     print_error("Unable to process '{}' value '{}' (as float):\n{}".format(k, v, e), fatal=True)
         elif k in ["msg_regex", "rule_regex"]:
@@ -910,10 +922,10 @@ class Ruleset():
                 print_error("Unable to compile RegEx pattern '{}': {}".format(v, e), fatal=True)
             try:
                 if k == "msg_regex":
-                    retarray = [s for s in self.metadata_dict.keys() if pattern_re.search(self.metadata_dict[s]['msg']) and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                    retarray = [s for s in self.metadata_dict.keys() if pattern_re.search(self.metadata_dict[s]['msg'])]
                 else:
                     # match against raw rule
-                    retarray = [s for s in self.metadata_dict.keys() if pattern_re.search(self.metadata_dict[s]['raw_rule']) and (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                    retarray = [s for s in self.metadata_dict.keys() if pattern_re.search(self.metadata_dict[s]['raw_rule'])]
             except Exception as e:
                 print_error("Problem matching RegEx pattern '{}': {}".format(v, e), fatal=True)
         else:
@@ -922,13 +934,13 @@ class Ruleset():
             else:
                 # special keyword '<all>' means all values for that key
                 if v in ["<all>", "<any>"]:
-                    retarray = [s for val in self.keys_dict[k].keys() for s in self.keys_dict[k][val] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                    retarray = [s for val in self.keys_dict[k].keys() for s in self.keys_dict[k][val]]
                 elif v not in self.keys_dict[k]:
                     print_warning("metadata key-value pair '{}' not found in ruleset".format(kvpair))
                     # retarray should stil be empty but in case not:
                     retarray = []
                 else:
-                    retarray = [s for s in self.keys_dict[k][v] if (not self.metadata_dict[s]['disabled'] or self.include_disabled_rules)]
+                    retarray = [s for s in self.keys_dict[k][v]]
         if negate:
             # if key or value not found, this will be all rules
             retarray = list(frozenset(self.get_all_sids()) - frozenset(retarray))
@@ -1248,19 +1260,21 @@ class Ruleset():
         """
         print_debug("print_ruleset_summary() called")
         print("")
+        # ignore disabled rules when printing summary
+        enabled_sids = [s for s in sids if not self.metadata_dict[s]['disabled']]
         i = 0
-        while i < len(sids):
+        while i < len(enabled_sids):
             if i < self.summary_max:
-                matchobj = rule_msg_re.search(self.metadata_dict[sids[i]]['raw_rule'])
+                matchobj = rule_msg_re.search(self.metadata_dict[enabled_sids[i]]['raw_rule'])
                 if not matchobj:
-                    print_warning("Unable to extract rule msg from '{}'.".format(self.metadata_dict[sids[i]]['raw_rule']))
+                    print_warning("Unable to extract rule msg from '{}'.".format(self.metadata_dict[enabled_sids[i]]['raw_rule']))
                     continue
                 msg = matchobj.group("MSG")
-                print("{} [sid:{}]".format(msg, sids[i]))
+                print("{} [sid:{}]".format(msg, enabled_sids[i]))
             else:
                 break
             i += 1
-        print("\n" + BLUE + "Showing {} of {} rules".format(i, len(sids)) + RESET)
+        print("\n" + BLUE + "Showing {} of {} enabled rules{}".format(i, len(enabled_sids), " ({} rules total, including disabled)".format(len(sids)) if len(sids) != len(enabled_sids) else '') + RESET)
         if pfmod_sids is not None and len(sids) > 0:
             pfmod_ratio = float(float(len(pfmod_sids)) / float(len(sids)))
             print(BLUE + "SIDs modifed by PFMod: {} of {} ({:.1%})".format(len(pfmod_sids), len(sids), pfmod_ratio) + RESET)
@@ -1282,7 +1296,15 @@ class Ruleset():
         """
         # TODO: handle order because of/based on flowbits? Ideally IDS engine should handle...
         #       see https://redmine.openinfosecfoundation.org/issues/1399
-
+        # AAAAAAAa
+        if not self.output_disabled_rules:
+            sid_list = [s for s in sid_list if not self.metadata_dict[s]['disabled']]
+        else:
+            # 'output_disabled_rules' set so all non-matching and disabled rules get printed as disabled rules
+            # Set all non-matching rules to 'disabled' and set sid_list to be all rules
+            for s in list(set(self.get_all_sids()) - set(sid_list)):
+                self.metadata_dict[s]['disabled'] = True
+            sid_list = self.get_all_sids()
         if modify_metadata is None:
             modify_metadata = self.modify_metadata
         if modify_metadata:
@@ -1299,6 +1321,9 @@ class Ruleset():
                     if key == "sid" and self.normalize:
                         # if normalize set, don't include 'sid' in metadata on output per BETTER recommendation
                         continue
+                    if key == "originally_disabled" and not self.enhance:
+                        # if the 'enhance' option is not enabled, don't include 'originally_disabled' key
+                        continue
                     for val in sorted(self.metadata_dict[s]['metadata'][key]):
                         metadata_string += "{} {}, ".format(key, val)
                 if len(metadata_string) > 0:
@@ -1313,19 +1338,27 @@ class Ruleset():
                     print_warning("No metadata found for SID {}.".format(s))
         if outfile is None:
             for s in sid_list:
-                if not self.metadata_dict[s]['disabled']:
-                    print("{}".format(self.metadata_dict[s]['raw_rule']))
+                if not self.metadata_dict[s]['disabled'] or self.output_disabled_rules:
+                    print("{}{}".format('#' if self.metadata_dict[s]['disabled'] else '', self.metadata_dict[s]['raw_rule']))
         else:
             try:
                 with open(outfile, "w") as fh:
-                    count = 0
+                    enabled_count = 0
+                    disabled_count = 0
                     for s in sid_list:
-                        if not self.metadata_dict[s]['disabled']:
-                            fh.write("{}\n".format(self.metadata_dict[s]['raw_rule']))
-                            count += 1
+                        if not self.metadata_dict[s]['disabled'] or self.output_disabled_rules:
+                            if not self.metadata_dict[s]['disabled']:
+                                fh.write("{}\n".format(self.metadata_dict[s]['raw_rule']))
+                                enabled_count += 1
+                            else:
+                                fh.write("#{}\n".format(self.metadata_dict[s]['raw_rule']))
+                                disabled_count += 1
             except Exception as e:
                 print_error("Problem writing to file '{}':\n{}".format(outfile, e), fatal=True)
-            print(GREEN + "Wrote {} rules to file, '{}'".format(count, outfile) + RESET + "\n")
+            print(GREEN + "Wrote {} rules {}to file, '{}'".format(
+                   (enabled_count + disabled_count),
+                   "({} enabled, {} disabled) ".format(enabled_count, disabled_count) if self.output_disabled_rules else '',
+                   outfile) + RESET + "\n")
 
 
 def get_parser():
@@ -1381,12 +1414,18 @@ AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 801814
                             help="display ruleset statistics about specified key(s). \
                                   If no key(s) supplied, then summary statistics for \
                                   all keys will be displayed.")
-        parser.add_argument("-i", "--include-disabled",
+        parser.add_argument("-i", "--enable-all-rules", "--enable-all", "--include-disabled",
                             action="store_true",
-                            dest="include_disabled_rules",
+                            dest="enable_all_rules",
                             required=False,
                             default=False,
-                            help="include (effectively enable) disabled rules when applying the filter")
+                            help="enable all valid rules, including those disabled/commented out in the given rules file(s), when applying the filter")
+        parser.add_argument("-c", "--output-disabled-rules",
+                            action="store_true",
+                            dest="output_disabled_rules",
+                            required=False,
+                            default=False,
+                            help="include disabled rules in the output as commented out lines.")
         parser.add_argument("-n", "--normalize", "--better", "--iso8601",
                             action="store_true",
                             dest="normalize",
@@ -1468,7 +1507,7 @@ def main():
         print_error("'metadata_filter' or 'stats' option required. Neither provided.", fatal=True)
 
     if args.display_max is None:
-        # option set but not max given; default to 16
+        # option set but not max given; defaults to 16
         args.display_max = 16
         print_summary = True
     elif args.display_max == -1:
@@ -1479,8 +1518,9 @@ def main():
 
     # create object
     rs = Ruleset(rules=args.rules, metadata_filter=args.metadata_filter,
-                 include_disabled_rules=args.include_disabled_rules,
+                 enable_all_rules=args.enable_all_rules,
                  summary_max=args.display_max,
+                 output_disabled_rules=args.output_disabled_rules,
                  ignore_classtype_keyword=args.ignore_classtype_keyword,
                  ignore_filename=args.ignore_filename,
                  normalize=args.normalize,
