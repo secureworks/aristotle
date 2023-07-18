@@ -60,6 +60,13 @@ and value:
     is assumed to have a numeric value.  Aristotle will throw
     an error if the ``risk_score`` key is used and the value cannot be converted to a float.
 
+.. important::
+    Disabled rules are still considered when filtering rules, but they remain disabled.  Disabled
+    rules can only be enabled at ruleset load (with the "enable-all-rules" option) or during
+    :doc:`Post Filter Modification <post_filter_mod>`.  If so configured -- by enabling the
+    "output-disabled-rules" option -- disabled rules will be included, commented out, in the
+    ruleset output.  See also :doc:`Disabled Rules <disabled_rules>`.
+
 Matching on the msg Field
 -------------------------
 A filter string supports the filtering of rules based on a regular expression

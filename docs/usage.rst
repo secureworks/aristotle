@@ -127,7 +127,7 @@ rules in the ``example.rules`` file and output the results to the file ``newrule
 
     python aristotle.py -r examples/example.rules -f '"malware <ALL>" AND ("attack_target http-server" or "attack_target tls-server")' -o newrules.rules
 
-Consume the rules defined in the ```examples/example.rules``, `Normalize`_ the metadata,
+Consume the rules defined in the ``examples/example.rules``, `Normalize`_ the metadata,
 apply the Boolean filter defined in the ``example1.filter`` file against the
 rules in the ``example.rules`` file, and output the results -- `with updated metadata` -- to
 the file ``newrules.rules``:
@@ -247,6 +247,13 @@ used for filtering and statistics generation.  The value will be the filename th
 This default behavior can be changed with a command line switch or in
 the :ref:`Ruleset class constructor <target Ruleset class>`.
 
+Disabled Rules
+--------------
+Internally, an ``originally_disabled`` key and boolean value (``true`` or ``false``, case insensitive) is added to
+the metadata of each rule.  If a rule from a rule file is a valid rule but commented out, the ``originally_disabled``
+value will be ``true``, otherwise it will be ``false``.  The ``originally_disabled`` metadata can be used for filtering,
+including `Post Filter Modification`_.  For more details see the :doc:`Disabled Rules <disabled_rules>` doc.
+
 .. _target Normalize Metadata:
 
 Normalize
@@ -290,6 +297,8 @@ to update the metadata on each.
     See the :ref:`Classtype` section.
   - ``filename``\* key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
     The value will be the filename the rule came from, if the rule was loaded from a file.  See the :ref:`Filename` section.
+  - ``originally_disabled`` key and boolean value gets added on each rule internally, and can be used for filtering, but only is included in the output
+    if "enhance" is enabled (along with `Modify Metadata`_).  See also the `Disabled Rules`_ section.
   - ``detection_direction`` keyword (see below).
 
 \* Key added by default unless explicitly disabled.

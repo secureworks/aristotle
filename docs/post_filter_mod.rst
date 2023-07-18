@@ -10,8 +10,12 @@ are applied.  This is known as "Post Filter Modification", a.k.a. "PFMod".
 
 PFMod allows for the identification of rules based on :doc:`Filter Strings <filter_strings>`, and
 then particular "actions" taken on those rules.  :ref:`PFMod Actions` include the
-ability to add/delete metadata, set ``priority``, and do a regular expression
+ability to add/delete metadata, enable/disable rules, set ``priority``, and do a regular expression
 based find and replace on the full rule.
+
+..  important::
+    Only rules that match the initial filter string phase are passed to PFMod
+    for consideration.
 
 PFMod YAML Format
 -----------------
@@ -43,8 +47,8 @@ PFMod YAML format:
      done to ensure the "includes" chain is a directed acyclic graph, so for now that responsibility
      falls on the user.
 
-.. warning:: PFMod requires that the "modify" (``-m``) be set and will enable it, if not enabled,
-     if a PFMod file is given.
+.. warning:: PFMod requires that the "modify" (``-m``) option be set and it will be automatically
+     enabled, if not already enabled, if a PFMod file is provided.
 
 PFMod Actions
 *************
@@ -52,6 +56,8 @@ PFMod Actions
 Supported ``actions`` are:
 
 -  ``disable`` - disable the rule.  This is a standalone string in the list.
+-  ``enable`` - enable the rule.  This is a standalone string in the list.  Note that for "disabled" rules to make it
+   to PFMod for consideration, they must first match in the initial filter string matching phase.
 -  ``add_metadata`` - key-value pair where the value is the metadata key-value pair to add (e.g. ``protocols http``).
    Note that if there is already metadata using the given key, it is not over written (unless the values are the
    same too in which case nothing is added since it already exists).
@@ -150,4 +156,13 @@ will be processed and then the latter.
           OR "msg_regex /INFORMATIONAL/i" OR "rule_regex /[\s\x3B\x28]priority\s*\x3A\s*5\s*\x3B"
         actions:
           - disable
-
+      - name: enable-disabled-critical
+        filter_string: >-
+          "signature_severity critical"
+          AND NOT "performance_impact significant"
+          AND "originally_disabled true"
+        actions:
+          - enable
+          - set_priority: 3
+          - add_metadata_exclusive: "risk_score 67"
+          - add_metadata: "soc_response_color pink"

@@ -19,6 +19,7 @@ script or utilized as a module.
    usage
    filter_strings
    post_filter_mod
+   disabled_rules
    module
    license-authors
 
