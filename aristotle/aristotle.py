@@ -61,8 +61,7 @@ rule_re = re.compile(
 disabled_rule_re = re.compile(r"^\x23\s*(?:pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B.*\x29$")
 sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
 metadata_keyword_re = re.compile(r"(?P<PRE>[\x28\x3B]\s*metadata\s*\x3A\s*)(?P<METADATA>[^\x3B]+)\x3B")
-classtype_keyword_re = re.compile(r"[\x28\x3B]\s*classtype\s*\x3A\s*(?P<CLASSTYPE>[^\x3B]+)\x3B")
-priority_keyword_re = re.compile(r"(?P<PRE>[\x28\x3B]\s*priority\s*\x3A\s*)(?P<PRIORITY>[^\x3B]+)\x3B")
+classtype_keyword_re = re.compile(r"(?P<PRE>[\x28\x3B]\s*classtype\s*\x3A\s*)(?P<CLASSTYPE>[^\x3B]+)\x3B")
 flow_re = re.compile(r"[\s\x3B\x28]flow\s*\x3A\s*(?P<FLOW>[^\x3B]+?)\x3B")
 app_layer_protocol_re = re.compile(r"[\s\x3B\x28]app-layer-protocol\s*\x3A\s*(?P<ALPROTO>[^\x3B]+?)\x3B")
 target_keyword_re = re.compile(r"[\x28\x3B]\s*target\s*\x3A\s*(?P<TARGET>[^\x3B]+)\x3B")
@@ -1034,10 +1033,24 @@ class Ruleset():
         valid_actions_dict = ["add_metadata",
                               "add_metadata_exclusive",
                               "delete_metadata",
-                              "set_priority",
                               "regex_sub"
+                              # set_<keyword> actions not listed here (see below)
                               ]
         # valid_actions = valid_actions_str + valid_actions_dict
+
+        # Supported rule keywords that can be updated by PFMod, e.g. "set_priority"
+        valid_set_keywords = {'sid': 'int',
+                              'gid': 'int',
+                              'rev': 'int',
+                              'priority': 'int',
+                              'msg': 'str',
+                              'reference': 'str_noquote',
+                              'classtype': 'str_noquote',
+                              'target': 'str_noquote',
+                              'threshold': 'str_noquote',
+                              'flow': 'str_noquote'
+                              }
+        keyword_re_template = r"(?P<PRE>[\x28\x3B]\s*{}\s*\x3A\s*)(?P<KEYWORD>[^\x3B]+)\x3B"
         matched_sids_all = set()
 
         print_debug("pfmod_apply() called")
@@ -1099,7 +1112,7 @@ class Ruleset():
                         elif type(action) == dict:
                             for action_key in action.keys():
                                 action_key = action_key.strip()
-                                if action_key not in valid_actions_dict:
+                                if action_key not in valid_actions_dict and not action_key.startswith("set_"):
                                     print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict))
                                     continue
                                 if len(str(action[action_key]).strip()) == 0:
@@ -1125,21 +1138,57 @@ class Ruleset():
                                         if action_key.endswith("exclusive"):
                                             self.delete_metadata(sid, key)
                                         self.add_metadata(sid, key, value)
-                                elif action_key == "set_priority":
-                                    print_debug("Setting priority on SID {}".format(sid))
-                                    priority = str(action[action_key]).strip()
-                                    try:
-                                        priority = int(priority)
-                                        if priority < 1 or priority > 255:
-                                            raise ValueError
-                                    except ValueError:
-                                        print_error("Invalid 'set_priority' value '{}' in PFMod rule named '{}': value must be integer in range 1-255.".format(priority, rule_name), fatal=True)
-                                    if priority_keyword_re.search(self.metadata_dict[sid]['raw_rule']):
-                                        self.metadata_dict[sid]['raw_rule'] = priority_keyword_re.sub(r'\g<PRE>' + str(priority) + ';', self.metadata_dict[sid]['raw_rule'])
+                                elif action_key.startswith("set_"):
+                                    keyword = action_key.split('_')[1]
+                                    if keyword not in valid_set_keywords.keys():
+                                        print_error("Invalid PFMod action '{}'.  Setting keyword '{}' not supported.".format(action_key, keyword))
+                                        continue
+                                    print_debug("PFMod: setting '{}' keyword on SID {} ...".format(keyword, sid))
+                                    keyword_value = str(action[action_key]).strip()
+                                    # input validation
+                                    int_keyword = ["sid",
+                                                   "priority",
+                                                   "gid",
+                                                   "rev"
+                                                   ]
+                                    if valid_set_keywords[keyword] == 'int':
+                                        # validate as int
+                                        try:
+                                            keyword_value = int(keyword_value)
+                                            if keyword in ["sid", "priority", "rev"] and keyword_value <= 0:
+                                                # note: 'priority' on Suricata should be 1-255
+                                                raise ValueError()
+                                            # can add other validation checks here as necessary but ultimately, the responsibility for proper syntax
+                                            # falls on the PFMod rule author.
+                                        except Exception as e:
+                                            print_error("Invalid value '{}' for keyword '{}' in PFMod rule named '{}': {}".format(keyword_value, keyword, rule_name, e), fatal=True)
                                     else:
-                                        # no 'priority' keyword in original rule; add one.
-                                        priority_string = " priority:{};)".format(priority)
-                                        self.metadata_dict[sid]['raw_rule'] = eol_re.sub(priority_string, self.metadata_dict[sid]['raw_rule'])
+                                        # validate as string
+                                        badchars = ['"', '\\', ';']
+                                        try:
+                                            for c in badchars:
+                                                # rough filter; technically these could be included in some contexts when properly escaped
+                                                if c in keyword_value:
+                                                    raise ValueError("Character '{}' not supported in value for PFMod action '{}'.".format(c, action_key))
+                                            if (keyword == "target" and keyword_value not in ['src_ip', 'dest_ip']):
+                                                raise ValueError()
+                                            # can add other validation checks here as necessary but ultimately, the responsibility for proper syntax
+                                            # falls on the PFMod rule author.
+                                            if valid_set_keywords[keyword] == "str":
+                                                # keyword value needs to be double quoted in the rule string
+                                                keyword_value = '"{}"'.format(keyword_value)
+                                        except Exception as e:
+                                            print_error("Invalid value '{}' for keyword '{}' in PFMod rule named '{}': {}".format(keyword_value, keyword, rule_name, e), fatal=True)
+                                    # update rule
+                                    keyword_re = re.compile(keyword_re_template.format(keyword))
+                                    if keyword_re.search(self.metadata_dict[sid]['raw_rule']):
+                                        print_debug("PFMod: Overwriting keyword '{}' with value '{}' for SID {}.".format(keyword, keyword_value,sid))
+                                        self.metadata_dict[sid]['raw_rule'] = keyword_re.sub(r'\g<PRE>' + str(keyword_value) + ';', self.metadata_dict[sid]['raw_rule'])
+                                    else:
+                                        # given keyword not in original rule; add one.
+                                        print_debug("PFMod: Adding keyword '{}' with value '{}' for SID {}.".format(keyword, keyword_value,sid))
+                                        keyword_string = " {}:{};)".format(keyword, keyword_value)
+                                        self.metadata_dict[sid]['raw_rule'] = eol_re.sub(keyword_string, self.metadata_dict[sid]['raw_rule'])
                                 elif action_key == "regex_sub":
                                     v = action[action_key]
                                     re_flag = 0
