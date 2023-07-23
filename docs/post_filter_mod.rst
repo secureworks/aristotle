@@ -66,8 +66,6 @@ Supported ``actions`` are:
 -  ``delete_metadata`` - if a key-value pair is given (e.g. ``former_category malware``) remove the key-value pair
    from the rule.  If just a key name is given (e.g. ``former_category``), remove all metadata using the given key,
    regardless of the value.
--  ``set_priority`` -- set the ``priority`` keyword in the rule to have the given value.  If the rule does not contain
-   a ``priority`` keyword, add it and set the value to the given value.
 -  ``regex_sub`` -- Perform a RegEx find and replace on the rule based on the given value. Details:
 
     -  Values follow the format ``/regex-to-find/replacement_string/i``
@@ -78,6 +76,28 @@ Supported ``actions`` are:
     -  For ``regex_sub`` values, it is recommended that they be *single quoted*.  Double
        quoted strings in YAML will interpret the backslash character as a control character
        which will cause issues in non-trivial regex if not encoded.
+
+-  ``set_<keyword>`` -- set the *<keyword>* in the IDS rule string to have the given value.  If the rule does not contain
+   the given keyword, add it and set the value to the given value. Little to no validation checking is done so it
+   is up to the PFMod rule author to ensure that the proper syntax is used for the keyword value(s).
+   Supported keywords and examples:
+
+    ================  =============  ===================================================================
+    IDS Rule Keyword  PFMod Action   Example
+    ================  =============  ===================================================================
+    priority          set_priority   ``set_priority: 4``
+    sid               set_sid        ``set_sid: 8675309``
+    gid               set_gid        ``set_gid: 0``
+    rev               set_rev        ``set_rev: 2``
+    msg               set_msg        ``set_msg: "New MSG"``
+    classtype         set_classtype  ``set_classtype: "command-and-control"``
+    reference         set_reference  ``set_reference: "url,examle.com"``
+    target*           set_target     ``set_target: "dest_ip"``
+    threshold         set_threshold  ``set_threshold: "type limit, count 1, track by_src, seconds 120"``
+    flow              set_flow       ``set_flow: "established,to_server"``
+    ================  =============  ===================================================================
+
+`*` Suricata only keyword
 
 .. note::
     PFMod ``rules`` and ``actions`` are applied in the order they are processed -- from top to bottom of the file. This
@@ -128,6 +148,8 @@ will be processed and then the latter.
         actions:
           - add_metadata_exclusive: "risk_score 10"
           - set_priority: 2
+          - set_target: "dest_ip"
+
       - name: ip-rules-outbound
         filter_string: >-
           (
@@ -150,6 +172,7 @@ will be processed and then the latter.
         actions:
           - regex_sub: '/^alert\x20/drop /'
           - add_metadata: "custom_action drop"
+          - set_target: "dest_ip"
       - name: disable-informational-and-audit
         filter_string: >-
           "signature_severity informational" OR "signature_severity audit"

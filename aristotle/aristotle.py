@@ -1167,7 +1167,8 @@ class Ruleset():
                                         badchars = ['"', '\\', ';']
                                         try:
                                             for c in badchars:
-                                                # rough filter; technically these could be included in some contexts when properly escaped
+                                                # Rough filter and cursory rule injection prevention.
+                                                # Technically these chars could be included in some contexts when properly escaped.
                                                 if c in keyword_value:
                                                     raise ValueError("Character '{}' not supported in value for PFMod action '{}'.".format(c, action_key))
                                             if (keyword == "target" and keyword_value not in ['src_ip', 'dest_ip']):
