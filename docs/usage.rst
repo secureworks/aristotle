@@ -263,13 +263,13 @@ The normalize command line option (also supported in
 the :ref:`Ruleset class constructor <target Ruleset class>` will do the following
 to the internal data structure used to store metadata and filter against:
 
-  - ``cve`` value normalized to ``YYYY-<num>``. If multiple CVEs are represented in the
+  - ``cve`` key value(s) normalized to ``YYYY-<num>``. If multiple CVEs are represented in the
     value and strung together with a ``_`` (e.g. ``cve_2021_27561_cve_2021_27562`` [`sic`])
-    then all identified CVEs will be included.
+    then all identified CVEs will be normalized and included.
   - Values from non-BETTER schema keys ``mitre_technique_id`` and ``mitre_tactic_id`` will be
     put into the standards compliant ``mitre_attack`` key.
   - date key values -- determined by any key names that end with ``_at`` or ``-at`` -- will
-    be attempted to be normalized to ``YYYY-MM-DD``.  A failure to parse or normalize
+    be attempted to be normalized to ISO 8601 format ``YYYY-MM-DD``.  A failure to parse or normalize
     the value will result in a warning message and the value being unchanged.
 
 If the :ref:`Modify Metadata`
