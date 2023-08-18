@@ -6,18 +6,15 @@ that are valid and syntactically correct, but are commented out.  Such rules are
 the fact that they are disabled is noted and can be used as criteria for :doc:`rule filtering <filter_strings>`
 and :doc:`Post Filter Modification <post_filter_mod>`.
 
-Details
--------
-
 Identification
-..............
+--------------
 
 Disabled rules are identifed by the lines starting with the comment character ``#`` but containing
 what appears to be a valid rule.  Whitespace before and after the comment character, as well as
 trailing whitespace is disregarded.
 
 Input
-.....
+-----
 
 By default, when a disabled rule is loaded, it is marked as "disabled". 
 All rules, including disabled rules, can be enabled at load time by using the "enable-all-rules" command line
@@ -50,7 +47,7 @@ rules can only be enabled at ruleset load (with the "enable-all-rules" option) o
     first match in the boolean filter string phase.
 
 Output
-......
+------
 
 .. hint::
     Include disabled rules as commented out lines in the output by using the "output-disabled-rules" option.

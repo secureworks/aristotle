@@ -1,8 +1,10 @@
 #!/usr/bin/env python
-"""Aristotle
+"""
+Aristotle
 
-Command line tool and library for filtering Suricata
-and Snort rulesets based on metadata keyword values.
+Command line tool and library for filtering and
+manipulating Suricata and Snort rulesets based
+on metadata keyword values.
 """
 # Copyright 2019 Secureworks, Inc.
 # Copyright 2023 Uber Technologies, Inc.
@@ -312,7 +314,7 @@ class Ruleset():
                          "$TELNET_SERVERS", "$FTP_SERVERS", "$DNP3_CLIENT", "$DNP3_SERVER", "$ICCP_CLIENT",
                          "$ICCP_SERVER", "$ENIP_CLIENT", "$ENIP_SERVER", "$MODBUS_CLIENT", "$MODBUS_SERVER"]
         external_net_vars = ["$EXTERNAL_NET", "$RFC1918", "$GOTOMYPC", "$AIM_SERVERS"]
-        # add CGNAT?
+        # add CG-NAT (10.64.0.0/10)?
         known_localnet_ips = ["10.0.0.0/8", "192.168.0.0/24", "172.16.0.0/12", "127.0.0.0/8", "255.255.255.255"]
         unknown = "UNDETERMINED"
         rfc1918_found = False
