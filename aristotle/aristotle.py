@@ -1038,7 +1038,7 @@ class Ruleset():
                               ]
         # valid_actions = valid_actions_str + valid_actions_dict
 
-        # Supported rule keywords that can be updated by PFMod, e.g. "set_priority"
+        # Supported rule keywords (and defined type) that can be updated by PFMod, e.g. using "set_priority"
         valid_set_keywords = {'sid': 'int',
                               'gid': 'int',
                               'rev': 'int',
@@ -1146,11 +1146,6 @@ class Ruleset():
                                     print_debug("PFMod: setting '{}' keyword on SID {} ...".format(keyword, sid))
                                     keyword_value = str(action[action_key]).strip()
                                     # input validation
-                                    int_keyword = ["sid",
-                                                   "priority",
-                                                   "gid",
-                                                   "rev"
-                                                   ]
                                     if valid_set_keywords[keyword] == 'int':
                                         # validate as int
                                         try:
@@ -1183,11 +1178,11 @@ class Ruleset():
                                     # update rule
                                     keyword_re = re.compile(keyword_re_template.format(keyword))
                                     if keyword_re.search(self.metadata_dict[sid]['raw_rule']):
-                                        print_debug("PFMod: Overwriting keyword '{}' with value '{}' for SID {}.".format(keyword, keyword_value,sid))
+                                        print_debug("PFMod: Overwriting keyword '{}' with value '{}' for SID {}.".format(keyword, keyword_value, sid))
                                         self.metadata_dict[sid]['raw_rule'] = keyword_re.sub(r'\g<PRE>' + str(keyword_value) + ';', self.metadata_dict[sid]['raw_rule'])
                                     else:
                                         # given keyword not in original rule; add one.
-                                        print_debug("PFMod: Adding keyword '{}' with value '{}' for SID {}.".format(keyword, keyword_value,sid))
+                                        print_debug("PFMod: Adding keyword '{}' with value '{}' for SID {}.".format(keyword, keyword_value, sid))
                                         keyword_string = " {}:{};)".format(keyword, keyword_value)
                                         self.metadata_dict[sid]['raw_rule'] = eol_re.sub(keyword_string, self.metadata_dict[sid]['raw_rule'])
                                 elif action_key == "regex_sub":
@@ -1324,7 +1319,10 @@ class Ruleset():
             else:
                 break
             i += 1
-        print("\n" + BLUE + "Showing {} of {} enabled rules{}".format(i, len(enabled_sids), " ({} rules total, including disabled)".format(len(sids)) if len(sids) != len(enabled_sids) else '') + RESET)
+        print("\n" + BLUE + "Showing {} of {} enabled rules{}".format(
+            i,
+            len(enabled_sids),
+            " ({} rules total, including disabled)".format(len(sids)) if len(sids) != len(enabled_sids) else '') + RESET)
         if pfmod_sids is not None and len(sids) > 0:
             pfmod_ratio = float(float(len(pfmod_sids)) / float(len(sids)))
             print(BLUE + "SIDs modifed by PFMod: {} of {} ({:.1%})".format(len(pfmod_sids), len(sids), pfmod_ratio) + RESET)
@@ -1346,7 +1344,6 @@ class Ruleset():
         """
         # TODO: handle order because of/based on flowbits? Ideally IDS engine should handle...
         #       see https://redmine.openinfosecfoundation.org/issues/1399
-        # AAAAAAAa
         if not self.output_disabled_rules:
             sid_list = [s for s in sid_list if not self.metadata_dict[s]['disabled']]
         else:
@@ -1406,9 +1403,9 @@ class Ruleset():
             except Exception as e:
                 print_error("Problem writing to file '{}':\n{}".format(outfile, e), fatal=True)
             print(GREEN + "Wrote {} rules {}to file, '{}'".format(
-                   (enabled_count + disabled_count),
-                   "({} enabled, {} disabled) ".format(enabled_count, disabled_count) if self.output_disabled_rules else '',
-                   outfile) + RESET + "\n")
+                (enabled_count + disabled_count),
+                "({} enabled, {} disabled) ".format(enabled_count, disabled_count) if self.output_disabled_rules else '',
+                outfile) + RESET + "\n")
 
 
 def get_parser():
