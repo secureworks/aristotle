@@ -283,7 +283,9 @@ Enhance
 
 The enhance command line option (also supported in
 the :ref:`Ruleset class constructor <target Ruleset class>` will analyze the rule(s) and attempt
-to update the metadata on each.
+to update the metadata on each.  Specifically, each rule will be examined ontologically, and new
+metadata keys and values will be induced and added to the rule (or merged if the key already
+exists).   Such metadata keys include:
 
   - ``flow`` key with values normalized to be ``to_server`` or ``to_client``.
   - ``protocols`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
@@ -299,7 +301,7 @@ to update the metadata on each.
     The value will be the filename the rule came from, if the rule was loaded from a file.  See the :ref:`Filename` section.
   - ``originally_disabled`` key and boolean value gets added on each rule internally, and can be used for filtering, but only is included in the output
     if "enhance" is enabled (along with `Modify Metadata`_).  See also the `Disabled Rules`_ section.
-  - ``detection_direction`` keyword (see below).
+  - ``detection_direction`` key (see below).
 
 \* Key added by default unless explicitly disabled.
 
@@ -332,7 +334,7 @@ The command line and the :ref:`Ruleset class constructor <target Ruleset class>`
 the option to update the metadata keyword value on output.  If this option is not set,
 Aristotle does not modify rules, it just enable or disables them based on the given
 filter.  However, if the `modify metadata` option is set, then the value of the ``metadata``
-keyword will be replaced with a string sourced form the internal data structure that
+keyword will be replaced with a string sourced from the internal data structure that
 Aristotle uses to track, parse, and filter metadata. Practically, the metadata will
 be updated accordingly:
 

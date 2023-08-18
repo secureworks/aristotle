@@ -7,10 +7,9 @@ against the ruleset and the filtered ruleset outputted.
 
 By default, Aristotle does *not* modify the contents of rules; it
 simply includes or excludes rules based on the given Boolean filter string.
-But that is not all Aristotle can do.  It can also :ref:`enhance <target Enhance Metadata>`
-and :ref:`normalize <target Normalize Metadata>`, for use in filtering and,
-if desired, output.  And rules can also be further
-modified using the :doc:`Post Filter Modification <post_filter_mod>` option and directives.
+But Aristotle is much more powerful than that.  It can also :ref:`enhance <target Enhance Metadata>`
+and :ref:`normalize <target Normalize Metadata>` metadata for use in filtering and even output.
+Rules can be further modified using the :doc:`Post Filter Modification <post_filter_mod>` option and directives.
 
 Aristotle is compatible with Python 2.7 and Python 3.x.
 

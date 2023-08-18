@@ -21,7 +21,7 @@ Input
 
 By default, when a disabled rule is loaded, it is marked as "disabled". 
 All rules, including disabled rules, can be enabled at load time by using the "enable-all-rules" command line
-option (also supported in the :ref:`Ruleset class constructor <target Ruleset class>`.  If this
+option (also supported in the :ref:`Ruleset class constructor <target Ruleset class>`).  If this
 is set, then all rules are marked as "enabled", but the ``originally_disabled`` key/value pair (see below)
 is set to reflect the state of the rule as originally loaded.  For example, if "enable-all-rules"
 was enabled, a rule that was originally disabled in a loaded rules file will be marked as "enabled",
@@ -58,12 +58,7 @@ Output
 Some downstream ruleset management systems or engine interfaces may expect and/or make use of disabled rules.
 Disabled rules are not included in ruleset output by default, but can be by enabling the
 "output-disabled-rules" command line option (also supported in the :ref:`Ruleset class
-constructor <target Ruleset class>`.
+constructor <target Ruleset class>`).
 
 If ":ref:`enhance <target Enhance Metadata>`" is enabled (along with :ref:`Modify Metadata`), then the ``originally_disabled``
-key/value pair will be included in the ruleet output
-
-Examples
---------
-
-TBD
+key/value pair will be included in the ruleset output.

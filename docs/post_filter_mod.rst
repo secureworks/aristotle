@@ -11,7 +11,7 @@ are applied.  This is known as "Post Filter Modification", a.k.a. "PFMod".
 PFMod allows for the identification of rules based on :doc:`Filter Strings <filter_strings>`, and
 then particular "actions" taken on those rules.  :ref:`PFMod Actions` include the
 ability to add/delete metadata, enable/disable rules, set ``priority``, and do a regular expression
-based find and replace on the full rule.
+based "find and replace" on the full rule.
 
 ..  important::
     Only rules that match the initial filter string phase are passed to PFMod
@@ -24,14 +24,15 @@ PFMod YAML Format
     Keep in mind, this is a YAML file and entries must conform to the YAML specification.
 
 PFMod rules (not to be confused with Suricata or Snort rules) are defined in
-YAML format and the rules YAML file passed to Aristotle. Some notes about the
-PFMod YAML format:
+YAML format in a file that is passed to Aristotle. For examples, see the :ref:`Example PFMod YAML Files`
+section.  Some notes about the
+PFMod rule definition:
 
 -  The ``version`` key is optional and can be used (in the future) to distinguish among different
    PFMod format versions.  However, at this point there is only one version -- 1.0.
 -  The ``include`` key can be given a list of (other) PFMod rules files to include. Files are
-   processed in the order they appear with files in the ``include`` list being processed
-   before any ``rules`` directives in a file.  If an absolute path is not given, the location
+   processed in the order they appear, with files in the ``include`` list being processed
+   before any ``rules`` directives in a file (basically depth-first search).  If an absolute path is not given, the location
    of the referenced file will assume to be relative to the file in which it is referenced.
 -  Under the ``rules`` key is a list of (PFMod) rules each with its applicable data:
 
@@ -59,7 +60,7 @@ Supported ``actions`` are:
 -  ``enable`` - enable the rule.  This is a standalone string in the list.  Note that for "disabled" rules to make it
    to PFMod for consideration, they must first match in the initial filter string matching phase.
 -  ``add_metadata`` - key-value pair where the value is the metadata key-value pair to add (e.g. ``protocols http``).
-   Note that if there is already metadata using the given key, it is not over written (unless the values are the
+   Note that if there is already metadata using the given key, it is not overwritten (unless the values are the
    same too in which case nothing is added since it already exists).
 -  ``add_metadata_exclusive`` - key-value pair where the value is the metadata key-value pair to add (e.g. ``priority high``).
    If the given key already exists, overwrite it with the new value.
@@ -75,7 +76,7 @@ Supported ``actions`` are:
        and support whatever the ``re`` library of the running version of Python supports.
     -  For ``regex_sub`` values, it is recommended that they be *single quoted*.  Double
        quoted strings in YAML will interpret the backslash character as a control character
-       which will cause issues in non-trivial regex if not encoded.
+       which will cause issues in non-trivial regular expressions if not encoded.
 
 -  ``set_<keyword>`` -- set the *<keyword>* in the IDS rule string to have the given value.  If the rule does not contain
    the given keyword, add it and set the value to the given value. Little to no validation checking is done so it
@@ -102,7 +103,8 @@ Supported ``actions`` are:
 .. note::
     PFMod ``rules`` and ``actions`` are applied in the order they are processed -- from top to bottom of the file. This
     means that, depending on how the rules and actions are written, subsequent rules and actions can affect changes
-    made by previous rules and actions.
+    made by previous rules and actions.  Remember too that the files included with the ``include`` key are processed
+    before any ``rules`` directives, resulting in a depth-first search type of behavior.
 
 Example PFMod YAML Files
 ------------------------
@@ -164,10 +166,10 @@ will be processed and then the latter.
       - name: drop-inbound-dns-requests
         filter_string: >-
           (
-            "detection_direction inbound" OR "detection_direction inbound-notexclusive"
+            "detection_direction inbound"
           ) AND (
             "protocols dns"
-            AND "rule_regex /dns[\x2E\x5F]query|3B|/"
+            AND "rule_regex /dns[\x2E\x5F]query\x3B/"
           )
         actions:
           - regex_sub: '/^alert\x20/drop /'
