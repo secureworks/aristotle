@@ -284,8 +284,8 @@ Enhance
 The enhance command line option (also supported in
 the :ref:`Ruleset class constructor <target Ruleset class>` will analyze the rule(s) and attempt
 to update the metadata on each.  Specifically, each rule will be examined ontologically, and new
-metadata keys and values will be induced and added to the rule (or merged if the key already
-exists).   Such metadata keys include:
+metadata keys and values will be identified, deduced, and induced.  These new metadata entries will be
+added to the rule (or merged if the key already exists).   Such metadata keys include:
 
   - ``flow`` key with values normalized to be ``to_server`` or ``to_client``.
   - ``protocols`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
@@ -308,7 +308,7 @@ exists).   Such metadata keys include:
 Detection Direction
 ...................
 
-The ``detection_direction`` metadata key attempts to normalize the directionality of traffic the rule
+The ``detection_direction`` metadata key attempts to induce and normalize the directionality of traffic the rule
 detects on. To do this, the source and destination (IP/IPVAR) sections of the rule are reduced down to "$HOME_NET",
 "$EXTERNAL_NET", "any", or "UNDETERMINED" and used to set the ``detection_direction`` value as follows:
 
