@@ -303,7 +303,7 @@ class Ruleset():
     def _reduce_ipval_helper(self, vals, global_negate=False):
         """ Take in list of IPVAR values and reduce to 'any', '$HOME_NET",
             '$EXTERNAL_NET", or 'UNKNOWN'.
-            Assumption: no overlap in home_net and external_net vars.
+            Assumption: no overlap in HOME_NET and EXTERNAL_NET vars.
 
             :param vals: list of IPVAR values
             :type vals: list, required
@@ -314,7 +314,7 @@ class Ruleset():
                          "$TELNET_SERVERS", "$FTP_SERVERS", "$DNP3_CLIENT", "$DNP3_SERVER", "$ICCP_CLIENT",
                          "$ICCP_SERVER", "$ENIP_CLIENT", "$ENIP_SERVER", "$MODBUS_CLIENT", "$MODBUS_SERVER"]
         external_net_vars = ["$EXTERNAL_NET", "$RFC1918", "$GOTOMYPC", "$AIM_SERVERS"]
-        # add CG-NAT (10.64.0.0/10)?
+        # add CG-NAT (100.64.0.0/10)?
         known_localnet_ips = ["10.0.0.0/8", "192.168.0.0/24", "172.16.0.0/12", "127.0.0.0/8", "255.255.255.255"]
         unknown = "UNDETERMINED"
         rfc1918_found = False

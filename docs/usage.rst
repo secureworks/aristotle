@@ -293,7 +293,7 @@ added to the rule (or merged if the key already exists).   Such metadata keys in
     The value(s) are based on data extracted from the raw rule, e.g. ``msg`` field, ``reference`` keyword, etc.
   - ``mitre_attack`` key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
     The value(s) are based on data extracted from the rule's ``reference`` keyword.
-  - ``hostile`` key and applicable values (``dest_ip`` or ``src_ip``, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
+  - ``hostile`` key and applicable values (``dest_ip`` or ``src_ip``), per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
     The values are the inverse of values taken from the ``target`` keyword.
   - ``classtype``\* key and applicable values, per the `BETTER Schema <https://better-schema.readthedocs.io/en/latest/schema.html#defined-keys>`__.
     See the :ref:`Classtype` section.
@@ -312,17 +312,19 @@ The ``detection_direction`` metadata key attempts to induce and normalize the di
 detects on. To do this, the source and destination (IP/IPVAR) sections of the rule are reduced down to "$HOME_NET",
 "$EXTERNAL_NET", "any", or "UNDETERMINED" and used to set the ``detection_direction`` value as follows:
 
-=============================  ==============================
+=============================  ==================================
 detection_direction value      reduced condition
-=============================  ==============================
+=============================  ==================================
 inbound                        ``$EXTERNAL_NET -> $HOME_NET``
 inbound-notexclusive           ``any -> $HOME_NET``
-outbound                       ``$HOME_NET -> $EXTERNAL_NET``
+outbound                       ``$HOME_NET -> $EXTERNAL_NET`` or
+                               ``$EXTERNAL_NET -> $EXTERNAL_NET``
 outbound-notexclusive          ``$HOME_NET -> any``
 internal                       ``$HOME_NET -> $HOME_NET``
 any                            ``any -> any``
 both                           direction in rule is ``<>``
-=============================  ==============================
+unknown                        UNDETERMINED
+=============================  ==================================
 
 Modify Metadata
 ---------------

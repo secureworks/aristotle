@@ -45,7 +45,7 @@ PFMod rule definition:
 .. warning::
      Using the ``include`` key to include files can create a cyclic situation if included files
      include themselves or subsequent files include previous files.  Currently, no checking is
-     done to ensure the "includes" chain is a directed acyclic graph, so for now that responsibility
+     done to ensure the "include" chain is a directed acyclic graph, so for now that responsibility
      falls on the user.
 
 .. warning:: PFMod requires that the "modify" (``-m``) option be set and it will be automatically
@@ -120,7 +120,7 @@ Example file using ``include`` to load multiple PFMod files:
     # Main includes file
 
     version: "1.0"
-    includes:
+    include:
       - "pfmod-inbound.yaml"
       - "pfmod-outbound.yaml"
       - "pfmod-malware.yaml"
@@ -143,15 +143,14 @@ will be processed and then the latter.
         filter_string: >-
           (
             "filename ip-blocklist.rules" OR "msg_regex /\x203CORESec\x20/i"
-            OR "rule_regex /^(pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+ip\s+/"
+            OR "rule_regex /^(pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+ip\s/"
           ) AND (
             "detection_direction inbound"
           )
         actions:
           - add_metadata_exclusive: "risk_score 10"
-          - set_priority: 2
+          - set_priority: 4
           - set_target: "dest_ip"
-
       - name: ip-rules-outbound
         filter_string: >-
           (
@@ -162,7 +161,7 @@ will be processed and then the latter.
         actions:
           - add_metadata_exclusive: "risk_score 51"
           - add_metadata: "soc_response_color brown"
-          - set_priority: 3
+          - set_priority: 2
       - name: drop-inbound-dns-requests
         filter_string: >-
           (
@@ -188,6 +187,6 @@ will be processed and then the latter.
           AND "originally_disabled true"
         actions:
           - enable
-          - set_priority: 3
-          - add_metadata_exclusive: "risk_score 67"
+          - set_priority: 2
+          - add_metadata_exclusive: "risk_score 70"
           - add_metadata: "soc_response_color pink"
