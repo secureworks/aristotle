@@ -505,7 +505,7 @@ class Ruleset():
         return
 
     def normalize_better(self, k, v, sid=None):
-        """ Try to convert date and cve related metadata values to conform to the
+        """ Try to convert date, MITRE ATT&CK, and cve related metadata values to conform to the
             BETTER schema for filtering and statistics. Currently applies to keys
             'cve', 'mitre_tactic_id', 'mitre_technique_id' and those ending with '_at' or "-at".
 
@@ -1480,7 +1480,7 @@ AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 801814
                             dest="normalize",
                             required=False,
                             default=False,
-                            help="try to convert date and cve related metadata values to conform to the \
+                            help="try to convert date, MITRE ATT&CK, and cve related metadata values to conform to the \
                                   BETTER schema for filtering and statistics.  Dates are normalized to the \
                                   format YYYY-MM-DD and CVEs to YYYY-<num>.  Also, 'sid' is removed from the metadata.")
         parser.add_argument("-e", "--enhance",

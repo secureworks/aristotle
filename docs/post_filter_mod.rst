@@ -59,13 +59,13 @@ Supported ``actions`` are:
 -  ``disable`` - disable the rule.  This is a standalone string in the list.
 -  ``enable`` - enable the rule.  This is a standalone string in the list.  Note that for "disabled" rules to make it
    to PFMod for consideration, they must first match in the initial filter string matching phase.
--  ``add_metadata`` - key-value pair where the value is the metadata key-value pair to add (e.g. ``protocols http``).
-   Note that if there is already metadata using the given key, it is not overwritten (unless the values are the
-   same too in which case nothing is added since it already exists).
--  ``add_metadata_exclusive`` - key-value pair where the value is the metadata key-value pair to add (e.g. ``priority high``).
-   If the given key already exists, overwrite it with the new value.
--  ``delete_metadata`` - if a key-value pair is given (e.g. ``former_category malware``) remove the key-value pair
-   from the rule.  If just a key name is given (e.g. ``former_category``), remove all metadata using the given key,
+-  ``add_metadata`` - YAML key-value pair where the (YAML) value is the metadata key-value pair to add (e.g. ``protocols http``).
+   Note that if there is already metadata using the given key, it is not overwritten unless the value is the
+   same too in which case nothing is added since it already exists.
+-  ``add_metadata_exclusive`` - YAML key-value pair where the (YAML) value is the metadata key-value pair to add (e.g. ``priority high``).
+   If the given metadata key already exists, overwrite it with the new value.
+-  ``delete_metadata`` - if a metadata key-value pair is given (e.g. ``former_category malware``) remove the key-value pair.
+   from the rule.  If just a metadata key name is given (e.g. ``former_category``), remove all metadata using the given key,
    regardless of the value.
 -  ``regex_sub`` -- Perform a RegEx find and replace on the rule based on the given value. Details:
 
