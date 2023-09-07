@@ -60,6 +60,7 @@ rule_re = re.compile(
     r"(?P<PROTO>[^\s]+)\s+(?P<SRCIP>[^\s]+)\s+(?P<SRCPORT>[^\s]+)\s+(?P<DIRECTION>[\x2D\x3C]\x3E)\s+(?P<DSTIP>[^\s]+)\s+(?P<DSTPORT>[^\s]+))\s+"
     r"\x28(?P<BODY>[^\x29]+)"
 )
+# Note: TODO? could have a generic re for keyword with a placeholder for the name; conflate with one in _pfmod_apply()
 disabled_rule_re = re.compile(r"^\x23\s*(?:pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B.*\x29$")
 sid_re = re.compile(r"[\x28\x3B]\s*sid\s*\x3A\s*(?P<SID>\d+)\s*\x3B")
 metadata_keyword_re = re.compile(r"(?P<PRE>[\x28\x3B]\s*metadata\s*\x3A\s*)(?P<METADATA>[^\x3B]+)\x3B")
@@ -1041,18 +1042,18 @@ class Ruleset():
         # valid_actions = valid_actions_str + valid_actions_dict
 
         # Supported rule keywords (and defined type) that can be updated by PFMod, e.g. using "set_priority"
-        valid_set_keywords = {'sid': 'int',
-                              'gid': 'int',
-                              'rev': 'int',
-                              'priority': 'int',
-                              'msg': 'str',
-                              'reference': 'str_noquote',
-                              'classtype': 'str_noquote',
-                              'target': 'str_noquote',
-                              'threshold': 'str_noquote',
-                              'flow': 'str_noquote'
+        valid_set_keywords = {'sid': {'type': 'int', 'default': 5000000},
+                              'gid': {'type': 'int', 'default': 1},
+                              'rev': {'type': 'int', 'default': 2},
+                              'priority': {'type': 'int', 'default': 3},
+                              'msg': {'type': 'str', 'default': None},
+                              'reference': {'type': 'str_noquote', 'default': None},
+                              'classtype': {'type': 'str_noquote', 'default': None},
+                              'target': {'type': 'str_noquote', 'default': None},
+                              'threshold': {'type': 'str_noquote', 'default': None},
+                              'flow': {'type': 'str_noquote', 'default': None}
                               }
-        keyword_re_template = r"(?P<PRE>[\x28\x3B]\s*{}\s*\x3A\s*)(?P<KEYWORD>[^\x3B]+)\x3B"
+        keyword_re_template = r"(?P<PRE>[\x28\x3B]\s*{}\s*\x3A\s*)(?P<VALUE>[^\x3B]+)\x3B"
         matched_sids_all = set()
 
         print_debug("pfmod_apply() called")
@@ -1148,7 +1149,40 @@ class Ruleset():
                                     print_debug("PFMod: setting '{}' keyword on SID {} ...".format(keyword, sid))
                                     keyword_value = str(action[action_key]).strip()
                                     # input validation
-                                    if valid_set_keywords[keyword] == 'int':
+                                    if valid_set_keywords[keyword]['type'] == 'int':
+                                        # 'int' keywords support leading '+' or '-' which will adjust the existing value of that keyword
+                                        # up (for '+') or down (for '-'). YAML must quote value with leading '+' or it will be treated as
+                                        # integer and the '+' won't be kept to be parsed here.
+                                        if len(keyword_value) > 1 and keyword_value[0] in ['+', '-']:
+                                            keyword_value_orig = keyword_value
+                                            adjust_up = True
+                                            if keyword_value[0] == '-':
+                                                adjust_up = False
+                                            keyword_value = keyword_value[1:]
+                                            try:
+                                                keyword_value = int(keyword_value)
+                                                # extract value
+                                                keyword_re = re.compile(keyword_re_template.format(keyword))
+                                                matchobj = keyword_re.search(self.metadata_dict[sid]['raw_rule'])
+                                                if not matchobj:
+                                                    print_warning("PFMod rule named '{}': keyword '{}' not found in SID {}. "
+                                                                  "Unable to add relative value '{}'.".format(rule_name, keyword, sid, keyword_value_orig))
+                                                    continue
+                                                else:
+                                                    rule_value = int(matchobj.group("VALUE"))
+                                                    if adjust_up:
+                                                        keyword_value = rule_value + keyword_value
+                                                    else:
+                                                        keyword_value = rule_value - keyword_value
+                                                        if (keyword in ["sid", "priority", "rev"] and keyword_value <= 0) or (keyword in ["gid"] and keyword_value < 0):
+                                                            keyword_value = 1
+                                                            if keyword in ["gid"]:
+                                                                keyword_value = 0
+                                                            print_warning("PFMod rule named '{}': keyword '{}' relative adjustment of value by {} results in a value below what is allowed for SID {};"
+                                                                          " setting to minimum value of '{}'.".format(rule_name, keyword, keyword_value_orig, sid, keyword_value))
+                                            except Exception as e:
+                                                print_error("Invalid value '{}' for keyword '{}' in PFMod rule named '{}': {}".format(keyword_value_orig, keyword, rule_name, e), fatal=True)
+
                                         # validate as int
                                         try:
                                             keyword_value = int(keyword_value)
@@ -1172,7 +1206,7 @@ class Ruleset():
                                                 raise ValueError()
                                             # can add other validation checks here as necessary but ultimately, the responsibility for proper syntax
                                             # falls on the PFMod rule author.
-                                            if valid_set_keywords[keyword] == "str":
+                                            if valid_set_keywords[keyword]['type'] == "str":
                                                 # keyword value needs to be double quoted in the rule string
                                                 keyword_value = '"{}"'.format(keyword_value)
                                         except Exception as e:
