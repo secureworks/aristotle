@@ -81,12 +81,22 @@ Supported ``actions`` are:
 -  ``set_<keyword>`` -- set the *<keyword>* in the IDS rule string to have the given value.  If the rule does not contain
    the given keyword, add it and set the value to the given value. Little to no validation checking is done so it
    is up to the PFMod rule author to ensure that the proper syntax is used for the keyword value(s).
+   For integer keywords (``priority``, ``rev``, ``gid``, and ``sid``), relative values can be used by preceding the
+   integer value with a '+' or '-'. (Note that the YAML value should be quoted in this case so that it is treated as
+   a string; if it is specified as an integer, the leading '+' will not be preserved when consuming the YAML.)  For
+   example, the action ``set_priority "-1"`` will cause the existing priority value in the rule to be decreased by
+   1; the action ``set_priority "+2"`` will cause the existing priority value to be increased by 2.  If a given keyword
+   (e.g. ``priority``, ``rev``, etc.) does not already exist in the rule, no changes will be made and a warning message will
+   be given.  If a relative modification caueses a value to drop below what the engine allows (e.g. a negative ``priority``
+   value), then the value will be set to the minimum allowed (e.g. ``priority: 1``).
    Supported keywords and examples:
 
     ================  =============  ===================================================================
     IDS Rule Keyword  PFMod Action   Example
     ================  =============  ===================================================================
     priority          set_priority   ``set_priority: 4``
+    priority          set_priority   ``set_priority: "+1"``
+    priority          set_priority   ``set_priority: "-1"``
     sid               set_sid        ``set_sid: 8675309``
     gid               set_gid        ``set_gid: 0``
     rev               set_rev        ``set_rev: 2``
@@ -97,6 +107,32 @@ Supported ``actions`` are:
     threshold         set_threshold  ``set_threshold: "type limit, count 1, track by_src, seconds 120"``
     flow              set_flow       ``set_flow: "established,to_server"``
     ================  =============  ===================================================================
+
+-  ``set_<arbitrary_integer_metadata>`` -- similar to ``add_metadata_exclusive``, allows for the setting or changing of an arbitrary
+   integer-based metadata key value, but also supports relative values along with default values.
+
+    Format:
+     .. code-block:: yaml
+
+         set_<arbitrary_integer_metadata>: "[-+]<value>[,<default>]"
+
+
+    Notes:
+     - The *<arbitrary_integer_metadata>* string corresponds to the metadata key name and must contain at least one underscore ('_') character.
+     - The metadata key being referenced should have a value corresponding to an integer.
+     - A preceding '+' or '-' to the given *<value>* will cause the existing metadata value in the rule to be increased or decreased by the given
+       *<value>*, respectively.  If the metadata key does not exist, then the value will be set to the given *<default>* value, if provided, otherwise
+       no change will be made.
+
+    Examples:
+      ============================  =====================================================================================================================================================================
+      Example                       Description
+      ============================  =====================================================================================================================================================================
+      ``set_risk_score: 42``        Set the "risk_score" metadata key to value 42.  Functionally the same as ``add_metadata_exclusive: "risk_score 42"``.
+      ``set_risk_score: "-10,50"``  Decrease the existing "risk_score" metadata key value by 10; if there is no "risk_score" metadata key name, add it and set it to the default value of 50.
+      ``set_risk_score: "+10"``     If there is an existing "risk_score" metadata key value, increase it by 10; otherwise do nothing.
+      ``set_machine_level: "-50"``  If there is an existing "machine_level" metadata key value, decrease it by 50; otherwise do nothing. (The key name can be arbitrary as long as it has an underscore.)
+      ============================  =====================================================================================================================================================================
 
 `*` Suricata only keyword
 

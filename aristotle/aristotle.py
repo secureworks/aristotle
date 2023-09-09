@@ -1120,7 +1120,62 @@ class Ruleset():
                                     continue
                                 if len(str(action[action_key]).strip()) == 0:
                                     print_error("No value for action '{}'.".format(action_key), fatal=True)
-                                if action_key == "delete_metadata":
+
+                                if action_key.startswith("set_") and len(action_key.split('_')) > 2:
+                                    # set arbitrary integer-based metadata key if key name has an underscore in it; support relative values and default value.
+                                    key = action_key.split('_', 1)[1]
+                                    print_debug("PFMod: setting '{}' metadata key on SID {} ...".format(key, sid))
+                                    key_value = str(action[action_key]).strip()
+                                    if len(key_value) > 1:
+                                        if key_value[0] in ['+', '-']:
+                                            key_value_orig = key_value
+                                            r = [x.strip() for x in key_value.split(',')]
+                                            default_value = None
+                                            if len(r) > 1:
+                                                # default given
+                                                default_value = r[1]
+                                                try:
+                                                    default_value = int(default_value)
+                                                except Exception as e:
+                                                    print_error("PFMod rule named '{}', action '{}': invalid default value '{}' (must be an integer).\n{}".format(
+                                                        rule_name, action_key, default_value, e), fatal=True)
+                                            try:
+                                                key_value = int(r[0])
+                                            except Exception as e:
+                                                print_error("PFMod rule named '{}', action '{}': invalid default '{}' (must be an integer).\n{}".format(
+                                                    rule_name, action_key, key_value, e), fatal=True)
+                                            # get existing value
+                                            if key in self.metadata_dict[sid]['metadata'].keys() and len(self.metadata_dict[sid]['metadata'][key]) > 0:
+                                                # grab the first value (if there are multiple entries)
+                                                existing_value = self.metadata_dict[sid]['metadata'][key][0]
+                                                try:
+                                                    existing_value = int(existing_value)
+                                                except Exception as e:
+                                                    print_error("PFMod rule named '{}', action '{}': invalid exiting metadata value '{}' for key '{}' in SID '{}' (must be an integer).  "
+                                                                "Skipping.  Error:\n{}".format(rule_name, action_key, existing_value, key, sid, e))
+                                                    continue
+                                                key_value = existing_value + key_value
+                                            else:
+                                                if default_value is not None:
+                                                    # use default
+                                                    print_debug("PFMod rule named '{}': metadata key '{}' not found in SID {}. "
+                                                                "Using default value '{}'.".format(rule_name, key, sid, default_value))
+                                                    key_value = default_value
+                                                else:
+                                                    print_warning("PFMod rule named '{}': metadata key '{}' not found in SID {}. "
+                                                                  "Unable to add relative value '{}'.".format(rule_name, key, sid, key_value_orig))
+                                                    continue
+                                        try:
+                                            key_value = int(key_value)
+                                        except Exception as e:
+                                            print_error("PFMod rule named '{}', action '{}': invalid value '{}' (must be an integer).\n{}".format(rule_name, action_key, key_value, e), fatal=True)
+                                        # effectivly make this "add_metadata_exclusive"
+                                        self.delete_metadata(sid, key)
+                                        self.add_metadata(sid, key, str(key_value))
+                                    else:
+                                        print_error("PFMod rule named '{}': Invalid value for action '{}'.".format(rule_name, action_key), fatal=True)
+
+                                elif action_key == "delete_metadata":
                                     a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
                                     if len(a) < 2:
                                         key = a[0]
@@ -1131,6 +1186,7 @@ class Ruleset():
                                         value = a[1]
                                         print_debug("Deleting all metadata with key-value pair '{} {}'.".format(key, value))
                                         self.delete_metadata(sid, key, value)
+
                                 elif action_key.startswith("add_metadata"):
                                     a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
                                     if len(a) != 2:
@@ -1141,6 +1197,7 @@ class Ruleset():
                                         if action_key.endswith("exclusive"):
                                             self.delete_metadata(sid, key)
                                         self.add_metadata(sid, key, value)
+
                                 elif action_key.startswith("set_"):
                                     keyword = action_key.split('_')[1]
                                     if keyword not in valid_set_keywords.keys():
@@ -1148,17 +1205,12 @@ class Ruleset():
                                         continue
                                     print_debug("PFMod: setting '{}' keyword on SID {} ...".format(keyword, sid))
                                     keyword_value = str(action[action_key]).strip()
-                                    # input validation
                                     if valid_set_keywords[keyword]['type'] == 'int':
                                         # 'int' keywords support leading '+' or '-' which will adjust the existing value of that keyword
                                         # up (for '+') or down (for '-'). YAML must quote value with leading '+' or it will be treated as
                                         # integer and the '+' won't be kept to be parsed here.
                                         if len(keyword_value) > 1 and keyword_value[0] in ['+', '-']:
                                             keyword_value_orig = keyword_value
-                                            adjust_up = True
-                                            if keyword_value[0] == '-':
-                                                adjust_up = False
-                                            keyword_value = keyword_value[1:]
                                             try:
                                                 keyword_value = int(keyword_value)
                                                 # extract value
@@ -1170,19 +1222,15 @@ class Ruleset():
                                                     continue
                                                 else:
                                                     rule_value = int(matchobj.group("VALUE"))
-                                                    if adjust_up:
-                                                        keyword_value = rule_value + keyword_value
-                                                    else:
-                                                        keyword_value = rule_value - keyword_value
-                                                        if (keyword in ["sid", "priority", "rev"] and keyword_value <= 0) or (keyword in ["gid"] and keyword_value < 0):
-                                                            keyword_value = 1
-                                                            if keyword in ["gid"]:
-                                                                keyword_value = 0
-                                                            print_warning("PFMod rule named '{}': keyword '{}' relative adjustment of value by {} results in a value below what is allowed for SID {};"
-                                                                          " setting to minimum value of '{}'.".format(rule_name, keyword, keyword_value_orig, sid, keyword_value))
+                                                    keyword_value = rule_value + keyword_value
+                                                    if (keyword in ["sid", "priority", "rev"] and keyword_value <= 0) or (keyword in ["gid"] and keyword_value < 0):
+                                                        keyword_value = 1
+                                                        if keyword in ["gid"]:
+                                                            keyword_value = 0
+                                                        print_warning("PFMod rule named '{}': keyword '{}' relative adjustment of value by {} results in a value below what is allowed for SID {};"
+                                                                      " setting to minimum value of '{}'.".format(rule_name, keyword, keyword_value_orig, sid, keyword_value))
                                             except Exception as e:
                                                 print_error("Invalid value '{}' for keyword '{}' in PFMod rule named '{}': {}".format(keyword_value_orig, keyword, rule_name, e), fatal=True)
-
                                         # validate as int
                                         try:
                                             keyword_value = int(keyword_value)
@@ -1221,6 +1269,7 @@ class Ruleset():
                                         print_debug("PFMod: Adding keyword '{}' with value '{}' for SID {}.".format(keyword, keyword_value, sid))
                                         keyword_string = " {}:{};)".format(keyword, keyword_value)
                                         self.metadata_dict[sid]['raw_rule'] = eol_re.sub(keyword_string, self.metadata_dict[sid]['raw_rule'])
+
                                 elif action_key == "regex_sub":
                                     v = action[action_key]
                                     re_flag = 0
