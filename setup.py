@@ -13,8 +13,9 @@ setup(
     url="https://github.com/secureworks/aristotle",
     packages=find_packages(),
     install_requires=[
-        "boolean.py>=3.6",
+        "boolean.py>=3.6,<=3.8",
         "python-dateutil",
+        "pyyaml"
     ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
