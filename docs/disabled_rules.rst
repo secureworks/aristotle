@@ -9,7 +9,7 @@ and :doc:`Post Filter Modification <post_filter_mod>`.
 Identification
 --------------
 
-Disabled rules are identifed by the lines starting with the comment character ``#`` but containing
+Disabled rules are identified by the lines starting with the comment character ``#`` but containing
 what appears to be a valid rule.  Whitespace before and after the comment character, as well as
 trailing whitespace is disregarded.
 

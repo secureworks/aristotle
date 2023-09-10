@@ -87,7 +87,7 @@ Supported ``actions`` are:
    example, the action ``set_priority "-1"`` will cause the existing priority value in the rule to be decreased by
    1; the action ``set_priority "+2"`` will cause the existing priority value to be increased by 2.  If a given keyword
    (e.g. ``priority``, ``rev``, etc.) does not already exist in the rule, no changes will be made and a warning message will
-   be given.  If a relative modification caueses a value to drop below what the engine allows (e.g. a negative ``priority``
+   be given.  If a relative modification causes a value to drop below what the engine allows (e.g. a negative ``priority``
    value), then the value will be set to the minimum allowed (e.g. ``priority: 1``).
    Supported keywords and examples:
 
@@ -102,7 +102,7 @@ Supported ``actions`` are:
     rev               set_rev        ``set_rev: 2``
     msg               set_msg        ``set_msg: "New MSG"``
     classtype         set_classtype  ``set_classtype: "command-and-control"``
-    reference         set_reference  ``set_reference: "url,examle.com"``
+    reference         set_reference  ``set_reference: "url,example.com"``
     target*           set_target     ``set_target: "dest_ip"``
     threshold         set_threshold  ``set_threshold: "type limit, count 1, track by_src, seconds 120"``
     flow              set_flow       ``set_flow: "established,to_server"``
@@ -171,7 +171,7 @@ will be processed and then the latter.
     ---
 
     # Created By George P. Burdell 2023-03-02
-    # For DMZ perimiter
+    # For DMZ perimeter
 
     version: "1.0"
     rules:

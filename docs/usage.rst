@@ -91,7 +91,7 @@ Example Usage
 
 .. note::
     ``aristotle.py`` in the root of the repository is a symlink
-    to ``aristotle/aristotle.py``.  If the evironment in use does
+    to ``aristotle/aristotle.py``.  If the environment in use does
     not recognize symlinks, adjust the paths accordingly.
 
 Show high level statistics on all the keys in the ``example.rules`` file:
@@ -330,7 +330,7 @@ Modify Metadata
 ---------------
 
 .. note::
-    No metadata is altered on output unless the Modify Metdata option is set!
+    No metadata is altered on output unless the Modify Metadata option is set!
 
 The command line and the :ref:`Ruleset class constructor <target Ruleset class>` offer
 the option to update the metadata keyword value on output.  If this option is not set,
