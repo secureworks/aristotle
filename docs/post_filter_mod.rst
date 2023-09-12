@@ -160,6 +160,7 @@ Example file using ``include`` to load multiple PFMod files:
       - "pfmod-inbound.yaml"
       - "pfmod-outbound.yaml"
       - "pfmod-malware.yaml"
+      - "pfmod-phishing.yaml"
 
 
 Example file with ``rules`` specified.  Note: you can have a PFMod file with ``include`` and ``rules``; the former
@@ -167,62 +168,85 @@ will be processed and then the latter.
 
 .. code-block:: yaml
 
-    %YAML 1.1
-    ---
+  YAML 1.1
+  ---
 
-    # Created By George P. Burdell 2023-03-02
-    # For DMZ perimeter
+  # Created By George P. Burdell 2023-03-14
+  # Handle Phishing Rules
 
-    version: "1.0"
-    rules:
-      - name: ip-rules-inbound
-        filter_string: >-
-          (
-            "filename ip-blocklist.rules" OR "msg_regex /\x203CORESec\x20/i"
-            OR "rule_regex /^(pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+ip\s/"
-          ) AND (
-            "detection_direction inbound"
-          )
-        actions:
-          - add_metadata_exclusive: "risk_score 10"
-          - set_priority: 4
-          - set_target: "dest_ip"
-      - name: ip-rules-outbound
-        filter_string: >-
-          (
-            "detection_direction outbound"
-            AND "rule_regex /^(pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+ip\s+/"
-            AND "signature_severity major"
-          )
-        actions:
-          - add_metadata_exclusive: "risk_score 51"
-          - add_metadata: "soc_response_color brown"
-          - set_priority: 2
-      - name: drop-inbound-dns-requests
-        filter_string: >-
-          (
-            "detection_direction inbound"
-          ) AND (
-            "protocols dns"
-            AND "rule_regex /dns[\x2E\x5F]query\x3B/"
-          )
-        actions:
-          - regex_sub: '/^alert\x20/drop /'
-          - add_metadata: "custom_action drop"
-          - set_target: "dest_ip"
-      - name: disable-informational-and-audit
-        filter_string: >-
-          "signature_severity informational" OR "signature_severity audit"
-          OR "msg_regex /INFORMATIONAL/i" OR "rule_regex /[\s\x3B\x28]priority\s*\x3A\s*5\s*\x3B"
-        actions:
-          - disable
-      - name: enable-disabled-critical
-        filter_string: >-
-          "signature_severity critical"
-          AND NOT "performance_impact significant"
-          AND "originally_disabled true"
-        actions:
-          - enable
-          - set_priority: 2
-          - add_metadata_exclusive: "risk_score 70"
-          - add_metadata: "soc_response_color pink"
+  version: "1.0"
+  rules:
+    - name: confidence-unknown
+      # set all rules without a 'confidence' metadata key to "confidence unknown"; populate for SIEM
+      filter_string: >-
+        NOT "confidence <ANY>"
+      actions:
+        - add_metadata: "confidence unknown"
+    - name: default-risk-score-50
+      # set all phishing related rules with out a risk_score metadata to 50
+      filter_string: >-
+        "filename phishing.rules" OR "msg_regex /phish/i"
+      actions:
+        - set_risk_score: "+0,50"
+    - name: phish-high-confidence
+      # add 5 to risk_score for phishing related rules wih "confidence high"
+      filter_string: >-
+        ("filename phishing.rules" OR "msg_regex /phish/i")
+        AND "confidence high"
+      actions:
+        - set_risk_score: "+5"
+    - name: phish-low-confidence
+      # subtract 10 to risk_score for phishing related rules wih "confidence low"
+      filter_string: >-
+        ("filename phishing.rules" OR "msg_regex /phish/i")
+        AND "confidence low"
+      actions:
+        - set_risk_score: "-10"
+    - name: phish-high-critical
+      # add 30 to risk_score for critical/high phishing related rules
+      filter_string: >-
+        ("severity critical" OR "priority high")
+        AND ("filename phishing.rules" OR "msg_regex /phish/i")
+      actions:
+        - set_risk_score: "+30"
+        - set_priority: 1
+        - add_metadata_exclusive: "priority high"
+    - name: phish-internal-landing-page
+      # add 50 to risk_score for detection of internal landing page or
+      # phishing panel being hosted; set rules to drop.
+      filter_string: >-
+        ("filename phishing.rules" OR "msg_regex /phish/i")
+        AND (("detection_direction outbound" OR "detection_direction outbound-notexclusive")
+             AND "protocols http" AND "flow to_client"
+            )
+      actions:
+        - set_risk_score: "+50"
+        - set_priority: 1
+        - add_metadata_exclusive: "priority high"
+        - regex_sub: '/^alert\x20/drop /'  # set to drop
+    - name: phish-major
+      # add 15 to risk_score for "severity major"  phishing related rules
+      filter_string: >-
+        ("severity major")
+        AND ("filename phishing.rules" OR "msg_regex /phish/i")
+      actions:
+        - set_risk_score: "+15"
+    - name: phish-malware-classtype
+      # Increase risk_score metadata if classtype if 'trojan-activty' or 'command-and-control'
+      filter_string: >-
+        ("classtype trojan-activity" OR "classtype command-and-control" OR "classtype targeted-activity")
+        AND ("filename phishing.rules" OR "msg_regex /phish/i")
+      actions:
+        - set_risk_score: "+15"
+    - name: phish-disable-low
+      # disable phishing rules marked as audit, info, or research
+      filter_string: >-
+        ("filename phishing.rules" OR "msg_regex /phish/i")
+        AND (
+             "signature_severity informational" OR "signature_severity audit" OR "msg_regex /INFORMATIONAL/i"
+             OR "rule_regex /[\s\x3B\x28]priority\s*\x3A\s*[45]\s*\x3B/" OR "priority research" OR "priority low"
+            )
+        AND NOT "rule_regex /[\s\x3B\x28]flowbits\s*\x3A\s?set/"
+      actions:
+        - set_risk_score: "-25" # in case a subsequent rule (re)enables this, the risk score will be accurate.
+        - disable
