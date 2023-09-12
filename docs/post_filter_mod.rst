@@ -189,14 +189,14 @@ will be processed and then the latter.
       actions:
         - set_risk_score: "+0,50"
     - name: phish-high-confidence
-      # add 5 to risk_score for phishing related rules wih "confidence high"
+      # add 5 to risk_score for phishing related rules with "confidence high"
       filter_string: >-
         ("filename phishing.rules" OR "msg_regex /phish/i")
         AND "confidence high"
       actions:
         - set_risk_score: "+5"
     - name: phish-low-confidence
-      # subtract 10 to risk_score for phishing related rules wih "confidence low"
+      # subtract 10 to risk_score for phishing related rules with "confidence low"
       filter_string: >-
         ("filename phishing.rules" OR "msg_regex /phish/i")
         AND "confidence low"
@@ -232,7 +232,7 @@ will be processed and then the latter.
       actions:
         - set_risk_score: "+15"
     - name: phish-malware-classtype
-      # Increase risk_score metadata if classtype if 'trojan-activty' or 'command-and-control'
+      # increase risk_score metadata by 15 for certain classtype values'
       filter_string: >-
         ("classtype trojan-activity" OR "classtype command-and-control" OR "classtype targeted-activity")
         AND ("filename phishing.rules" OR "msg_regex /phish/i")
@@ -246,7 +246,7 @@ will be processed and then the latter.
              "signature_severity informational" OR "signature_severity audit" OR "msg_regex /INFORMATIONAL/i"
              OR "rule_regex /[\s\x3B\x28]priority\s*\x3A\s*[45]\s*\x3B/" OR "priority research" OR "priority low"
             )
-        AND NOT "rule_regex /[\s\x3B\x28]flowbits\s*\x3A\s?set/"
+        AND NOT "rule_regex /[\s\x3B\x28]flowbits\s*\x3A\s*set/"  # don't disable flowbits setters
       actions:
         - set_risk_score: "-25" # in case a subsequent rule (re)enables this, the risk score will be accurate.
         - disable
