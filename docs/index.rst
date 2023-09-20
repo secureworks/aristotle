@@ -13,6 +13,8 @@ rulesets so they can be optimized for particular environments, resulting in
 enhanced alert outputs and a reduction in false positives.
 Aristotle  can be run as a standalone script or utilized as a module.
 
+.. image:: _static/aristotle.png
+
 .. toctree::
    :maxdepth: -1
    :caption: Contents:

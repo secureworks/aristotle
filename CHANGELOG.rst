@@ -24,7 +24,7 @@ Made it so module could be invoked via command line, e.g.:
 
     python3 -m aristotle -r examples/example.rules --stats
 
-2.0.0 (2023-xx-xx)
+2.0.0 (2023-09-20)
 ##################
 
 Features added:
