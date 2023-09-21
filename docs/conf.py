@@ -22,13 +22,13 @@ import pygments
 # -- Project information -----------------------------------------------------
 
 project = u'Aristotle'
-copyright = u'2019, Secureworks'
+copyright = u'2019 Secureworks, Inc., 2023 Uber Technologies, Inc.'
 author = u'David Wharton'
 
 # The short X.Y version
-version = u'1.0'
+version = u'2.0'
 # The full version, including alpha/beta/rc tags
-release = u'1.0.2'
+release = u'2.0.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -66,7 +66,7 @@ master_doc = 'index'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.

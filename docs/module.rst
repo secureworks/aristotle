@@ -36,6 +36,24 @@ Example:
 
 ``Ruleset`` class and functions:
 
-.. autoclass:: aristotle.Ruleset
-   :members: get_stats, set_metadata_filter, filter_ruleset, output_rules, get_all_sids, print_header, print_stats, print_ruleset_summary
+.. _target Ruleset class:
 
+.. autoclass:: aristotle.Ruleset
+   :members: set_metadata_filter,
+             reduce_ipval,
+             normalize_better,
+             add_metadata,
+             delete_metadata,
+             parse_rules,
+             cve_compare,
+             get_all_sids,
+             get_enabled_sids,
+             get_disabled_sids,
+             get_sids,
+             evaluate,
+             filter_ruleset,
+             print_header,
+             get_stats,
+             print_stats,
+             print_ruleset_summary,
+             output_rules
