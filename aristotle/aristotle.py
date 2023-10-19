@@ -1719,11 +1719,11 @@ def main():
         if print_summary:
             rs.print_ruleset_summary(filtered_sids, pfmod_sids)
         else:
-            rs.output_rules(sid_list=filtered_sids, outfile=None, modify_metadata=args.modify_metadata)
+            rs.output_rules(sid_list=filtered_sids, outfile=None)
     else:
         if print_summary:
             rs.print_ruleset_summary(filtered_sids, pfmod_sids)
-        rs.output_rules(sid_list=filtered_sids, outfile=args.outfile, modify_metadata=args.modify_metadata)
+        rs.output_rules(sid_list=filtered_sids, outfile=args.outfile)
 
 
 if __name__ == "__main__":
