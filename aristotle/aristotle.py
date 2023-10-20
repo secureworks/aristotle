@@ -1069,7 +1069,7 @@ class Ruleset():
         if not type(pfmod_rules) == dict:
             print_error("Unexpected YAML format in file '{}'. Cannot continue.".format(pfmod_file), fatal=True)
 
-        if "include" in pfmod_rules.keys():
+        if "include" in pfmod_rules.keys() and pfmod_rules['include'] is not None:
             # Note: allowing for include directives creates a directed graph but checking is not done
             # to ensure it is acyclic.  We could check to ensure this is a DAG but for now, it's the
             # responsibility of the user.
@@ -1079,9 +1079,9 @@ class Ruleset():
                 matched_sids_all.update(self._pfmod_apply(f, sids))
         elif "rules" not in pfmod_rules.keys():
             print_error("No 'rules' directives defined in file '{}'.".format(pfmod_file), fatal=True)
-        if "version" in pfmod_rules.keys():
+        if "version" in pfmod_rules.keys() and pfmod_rules['version'] is not None:
             print_debug("Processing PFMod rules file '{}', version {}.".format(os.path.basename(pfmod_file), pfmod_rules['version']))
-        if "rules" in pfmod_rules.keys():
+        if "rules" in pfmod_rules.keys() and pfmod_rules['rules'] is not None:
             for rule in pfmod_rules['rules']:
                 rule_name = "<undefined>"
                 if "name" in rule.keys():
