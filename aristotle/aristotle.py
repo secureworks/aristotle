@@ -1137,11 +1137,12 @@ class Ruleset():
                                         # check if key exists
                                         if key not in self.metadata_dict[sid]['metadata'].keys():
                                             print_warning("PFMod rule named '{}': metadata key '{}' not found in SID {}. "
-                                                           "Unable to perform action '{}'.".format(rule_name, key, sid, action_key))
+                                                          "Unable to perform action '{}'.".format(rule_name, key, sid, action_key))
                                             continue
                                         # check if new key exists and leave it alone if it does
                                         if new_key in self.metadata_dict[sid]['metadata'].keys():
-                                            print_warning("PFMod rule named '{}': destination metadata key '{}' already exists.  Not overwriting with action '{}'.".format(rule_name, new_key, action_key))
+                                            print_warning("PFMod rule named '{}': destination metadata key '{}' already exists.  "
+                                                          "Not overwriting with action '{}'.".format(rule_name, new_key, action_key))
                                             continue
                                         # copy key to new key
                                         for v in self.metadata_dict[sid]['metadata'][key]:
