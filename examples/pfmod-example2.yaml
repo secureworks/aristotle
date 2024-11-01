@@ -18,6 +18,12 @@ rules:
       "filename phishing.rules" OR "msg_regex /phish/i"
     actions:
       - set_risk_score: "+0,50"
+  - name: phish-risk-score-copy
+    # copy the existing value of the key "risk_score" into a new key, "risk_score_original"
+    filter_string: >-
+      "filename phishing.rules" OR "msg_regex /phish/i"
+    actions:
+      - copy_key: "risk_score risk_score_original"
   - name: phish-high-confidence
     # add 5 to risk_score for phishing related rules with "confidence high"
     filter_string: >-
@@ -69,14 +75,14 @@ rules:
     actions:
       - set_risk_score: "+15"
   - name: phish-disable-low
-    # disable phishing rules marked as audit, info, or research
+    # disable phishing rules marked as audit, info, or research; don't disable flowbits setters
     filter_string: >-
       ("filename phishing.rules" OR "msg_regex /phish/i")
       AND (
            "signature_severity informational" OR "signature_severity audit" OR "msg_regex /INFORMATIONAL/i"
            OR "rule_regex /[\s\x3B\x28]priority\s*\x3A\s*[45]\s*\x3B/" OR "priority research" OR "priority low"
           )
-      AND NOT "rule_regex /[\s\x3B\x28]flowbits\s*\x3A\s*set/" # don't disable flowbits setters
+      AND NOT "rule_regex /[\s\x3B\x28]flowbits\s*\x3A\s*set/"
     actions:
-      - set_risk_score: "-25" # in case a subsequent rule (re)enables this, the risk score will be accurate.
+      - set_risk_score: "-25"  # in case a subsequent rule (re)enables this, the risk score will be accurate.
       - disable

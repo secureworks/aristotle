@@ -38,3 +38,15 @@ Features added:
 See documentation for details.
 
 Special thanks: Uber
+
+2.1.0 (2024-11-01)
+##################
+
+Features added:
+
+  - Add support for PFMod 'copy_key' action
+
+Bug Fixes:
+
+  - The enabling of modify_metadata automatically if unset when a PFMod file is given wasn't being honored when running as a script.
+  - Empty PFMod YAML entries were not always being handled properly.

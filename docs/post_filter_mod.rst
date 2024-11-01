@@ -59,6 +59,8 @@ Supported ``actions`` are:
 -  ``disable`` - disable the rule.  This is a standalone string in the list.
 -  ``enable`` - enable the rule.  This is a standalone string in the list.  Note that for "disabled" rules to make it
    to PFMod for consideration, they must first match in the initial filter string matching phase.
+-  ``copy_key`` - copy the value from one metadata key to a new one. Format: ``<src_key> <dst_key>``, e.g.
+   ``risk_score risk_score_original``.  If the destination key already exists, it will *not* be overwritten.
 -  ``add_metadata`` - YAML key-value pair where the (YAML) value is the metadata key-value pair to add (e.g. ``protocols http``).
    Note that if there is already metadata using the given key, it is not overwritten unless the value is the
    same too in which case nothing is added since it already exists.

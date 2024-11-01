@@ -26,9 +26,9 @@ copyright = u'2019 Secureworks, Inc., 2023 Uber Technologies, Inc.'
 author = u'David Wharton'
 
 # The short X.Y version
-version = u'2.0'
+version = u'2.1'
 # The full version, including alpha/beta/rc tags
-release = u'2.0.0'
+release = u'2.1.0'
 
 
 # -- General configuration ---------------------------------------------------
