@@ -1036,7 +1036,8 @@ class Ruleset():
         valid_actions_dict = ["add_metadata",
                               "add_metadata_exclusive",
                               "delete_metadata",
-                              "regex_sub"
+                              "regex_sub",
+                              "copy_key",
                               # set_<keyword> actions not listed here (see below)
                               ]
         # valid_actions = valid_actions_str + valid_actions_dict
@@ -1068,7 +1069,7 @@ class Ruleset():
         if not type(pfmod_rules) == dict:
             print_error("Unexpected YAML format in file '{}'. Cannot continue.".format(pfmod_file), fatal=True)
 
-        if "include" in pfmod_rules.keys():
+        if "include" in pfmod_rules.keys() and pfmod_rules['include'] is not None:
             # Note: allowing for include directives creates a directed graph but checking is not done
             # to ensure it is acyclic.  We could check to ensure this is a DAG but for now, it's the
             # responsibility of the user.
@@ -1078,9 +1079,9 @@ class Ruleset():
                 matched_sids_all.update(self._pfmod_apply(f, sids))
         elif "rules" not in pfmod_rules.keys():
             print_error("No 'rules' directives defined in file '{}'.".format(pfmod_file), fatal=True)
-        if "version" in pfmod_rules.keys():
+        if "version" in pfmod_rules.keys() and pfmod_rules['version'] is not None:
             print_debug("Processing PFMod rules file '{}', version {}.".format(os.path.basename(pfmod_file), pfmod_rules['version']))
-        if "rules" in pfmod_rules.keys():
+        if "rules" in pfmod_rules.keys() and pfmod_rules['rules'] is not None:
             for rule in pfmod_rules['rules']:
                 rule_name = "<undefined>"
                 if "name" in rule.keys():
@@ -1121,7 +1122,33 @@ class Ruleset():
                                 if len(str(action[action_key]).strip()) == 0:
                                     print_error("No value for action '{}'.".format(action_key), fatal=True)
 
-                                if action_key.startswith("set_") and len(action_key.split('_')) > 2:
+                                if action_key == "copy_key":
+                                    a = [k.strip().lower() for k in action[action_key].split(' ') if len(k.strip()) > 0]
+                                    if len(a) != 2:
+                                        print_error("Invalid value for action '{}' in PFMod rule '{}'. "
+                                                    "Expected 2 arguments but received {}".format(action_key, rule_name, len(a)))
+                                    else:
+                                        key = a[0]
+                                        new_key = a[1]
+                                        if key == new_key:
+                                            print_error("Invalid action found: '{}' in PFMod rule named '{}'. Old and new keyword names are both '{}'. "
+                                                        " You are doing it wrong.".format(action_key, rule_name, key))
+                                            continue
+                                        # check if key exists
+                                        if key not in self.metadata_dict[sid]['metadata'].keys():
+                                            print_warning("PFMod rule named '{}': metadata key '{}' not found in SID {}. "
+                                                          "Unable to perform action '{}'.".format(rule_name, key, sid, action_key))
+                                            continue
+                                        # check if new key exists and leave it alone if it does
+                                        if new_key in self.metadata_dict[sid]['metadata'].keys():
+                                            print_warning("PFMod rule named '{}': destination metadata key '{}' already exists.  "
+                                                          "Not overwriting with action '{}'.".format(rule_name, new_key, action_key))
+                                            continue
+                                        # copy key to new key
+                                        for v in self.metadata_dict[sid]['metadata'][key]:
+                                            self.add_metadata(sid, new_key, v)
+
+                                elif action_key.startswith("set_") and len(action_key.split('_')) > 2:
                                     # set arbitrary integer-based metadata key if key name has an underscore in it; support relative values and default value.
                                     key = action_key.split('_', 1)[1]
                                     print_debug("PFMod: setting '{}' metadata key on SID {} ...".format(key, sid))
@@ -1176,7 +1203,7 @@ class Ruleset():
                                         print_error("PFMod rule named '{}': Invalid value for action '{}'.".format(rule_name, action_key), fatal=True)
 
                                 elif action_key == "delete_metadata":
-                                    a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
+                                    a = [k.strip().lower() for k in action[action_key].split(' ', 1) if len(k.strip()) > 0]
                                     if len(a) < 2:
                                         key = a[0]
                                         print_debug("Deleting all metadata for key '{}'.".format(key))
@@ -1188,7 +1215,7 @@ class Ruleset():
                                         self.delete_metadata(sid, key, value)
 
                                 elif action_key.startswith("add_metadata"):
-                                    a = [k.strip().lower() for k in action[action_key].split(' ', 1)]
+                                    a = [k.strip().lower() for k in action[action_key].split(' ', 1) if len(k.strip()) > 0]
                                     if len(a) != 2:
                                         print_error("Invalid value for action '{}' in PFMod rule '{}'.".format(action_key, rule_name))
                                     else:
@@ -1693,11 +1720,11 @@ def main():
         if print_summary:
             rs.print_ruleset_summary(filtered_sids, pfmod_sids)
         else:
-            rs.output_rules(sid_list=filtered_sids, outfile=None, modify_metadata=args.modify_metadata)
+            rs.output_rules(sid_list=filtered_sids, outfile=None)
     else:
         if print_summary:
             rs.print_ruleset_summary(filtered_sids, pfmod_sids)
-        rs.output_rules(sid_list=filtered_sids, outfile=args.outfile, modify_metadata=args.modify_metadata)
+        rs.output_rules(sid_list=filtered_sids, outfile=args.outfile)
 
 
 if __name__ == "__main__":
