@@ -222,7 +222,7 @@ class Ruleset():
                 self._enhance_metadata()
             print_debug("Total cache size: {}".format(len(ipval_cache.keys())))
         except Exception as e:
-            traceback.print_exc(e)
+            traceback.print_exc()
             print_error("Unable to process rules '{}':\n{}".format(rules, e), fatal=True)
 
     def set_metadata_filter(self, metadata_filter):
@@ -743,7 +743,7 @@ class Ruleset():
                 self.add_metadata(sid, 'originally_disabled', str(self.metadata_dict[sid]['originally_disabled']))
 
         except Exception as e:
-            traceback.print_exc(e)
+            traceback.print_exc()
             print_error("Problem loading rules: {}".format(e), fatal=True)
 
     def cve_compare(self, left_val, right_val, cmp_operator):
@@ -891,30 +891,33 @@ class Ruleset():
                 try:
                     lbound = float('-inf')
                     ubound = float('inf')
+                    lbound_inclusive = False
+                    ubound_inclusive = False
                     offset = 1
                     if v.startswith('<'):
                         if v[offset] == '=':
                             offset += 1
+                            ubound_inclusive = True
                         ubound = float(v[offset:].strip())
-                        ubound += (float(offset) - 1.0)
                     else:  # v.startswith('>'):
                         if v[offset] == '=':
                             offset += 1
+                            lbound_inclusive = True
                         lbound = float(v[offset:].strip())
-                        lbound -= (float(offset) - 1.0)
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
                     retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
                                 for val in self.metadata_dict[s]["metadata"][k]
-                                if (float(val) < float(ubound) and float(val) > float(lbound))]
+                                if (float(val) < ubound or (ubound_inclusive and float(val) == ubound))
+                                and (float(val) > lbound or (lbound_inclusive and float(val) == lbound))]
                 except Exception as e:
                     print_error("Unable to process '{}' value '{}' (as float):\n{}".format(k, v, e), fatal=True)
         elif k in ["msg_regex", "rule_regex"]:
             # apply regex pattern to rule msg field
-            if not (v.startswith('/') or v.endswith('.') or v.endswith("/i")):
+            if not (v.startswith('/') and (v.endswith('/') or v.endswith('/i'))):
                 print_error("Bad {} pattern '{}' in filter string. Pattern must start with '/' and end with '/' or '/i'.".format(k, v), fatal=True)
             re_flag = 0
             re_v = v
-            if v.endswith('i'):
+            if v.endswith('/i'):
                 re_flag = re.I
                 re_v = v[:-1]
             re_v = re_v.strip('/')
@@ -1003,7 +1006,7 @@ class Ruleset():
                 tstrip = ' '.join(tsplit)
             else:
                 # if just key provided (no value), match on all values
-                tstrip = "{} <all>".format(tstrip)
+                tstrip = "{} <all>".format(tsplit[0])
             print_debug(tstrip)
             # if token begins with digit, the tokenizer doesn't like it
             hashstr = "D" + hashlib.md5(tstrip.encode()).hexdigest()

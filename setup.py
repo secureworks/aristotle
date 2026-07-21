@@ -1,11 +1,18 @@
+import os
+
 from setuptools import setup, find_packages
 
-with open("README.rst", "r") as fh:
+here = os.path.abspath(os.path.dirname(__file__))
+
+with open(os.path.join(here, "README.rst"), "r") as fh:
     long_description = fh.read()
+
+with open(os.path.join(here, "VERSION"), "r") as fh:
+    version = fh.read().strip()
 
 setup(
     name="aristotle",
-    version="2.1.0",
+    version=version,
     author="David Wharton",
     description="Script and library for the viewing, filtering, and modifying of Suricata and Snort rulesets based on interpreted key-value pairs present in the metadata keyword within each rule.",
     long_description=long_description,

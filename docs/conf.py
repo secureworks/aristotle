@@ -25,10 +25,11 @@ project = u'Aristotle'
 copyright = u'2019 Secureworks, Inc., 2023 Uber Technologies, Inc.'
 author = u'David Wharton'
 
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'VERSION'), 'r') as fh:
+    # The full version, including alpha/beta/rc tags
+    release = fh.read().strip()
 # The short X.Y version
-version = u'2.1'
-# The full version, including alpha/beta/rc tags
-release = u'2.1.0'
+version = release.rsplit('.', 1)[0]
 
 
 # -- General configuration ---------------------------------------------------
