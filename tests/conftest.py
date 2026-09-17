@@ -72,6 +72,19 @@ SMALL_RULES_STR = "\n".join(SMALL_RULES) + "\n"
 SMALL_SIDS = {1, 2, 3, 4, 5, 6, 7, 8}
 
 
+def pytest_addoption(parser):
+    parser.addoption("--run-slow", action="store_true", default=False, help="run tests marked 'slow' (benchmarks)")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--run-slow"):
+        return
+    skip = pytest.mark.skip(reason="needs --run-slow")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip)
+
+
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 

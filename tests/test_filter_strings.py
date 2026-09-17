@@ -5,7 +5,7 @@ import pytest
 
 from aristotle.aristotle import AristotleException, Ruleset
 
-from .conftest import SMALL_SIDS
+from .conftest import SMALL_SIDS, make_rule
 
 
 def f(rs, filter_string):
@@ -56,7 +56,7 @@ class TestBooleanLogic:
 
     def test_expression_simplifying_to_false_returns_empty_list(self, small_ruleset):
         # Regression: boolean.py simplifies this to a constant and evaluate() returned None
-        assert small_ruleset.filter_ruleset('"priority high" AND NOT "priority high"') == []
+        assert set(small_ruleset.filter_ruleset('"priority high" AND NOT "priority high"')) == set()
 
     def test_expression_simplifying_to_true_returns_all_sids(self, small_ruleset):
         assert f(small_ruleset, '"priority high" OR NOT "priority high"') == SMALL_SIDS
@@ -64,6 +64,70 @@ class TestBooleanLogic:
     def test_disabled_rules_match_but_stay_disabled(self, small_ruleset):
         assert f(small_ruleset, '"protocols smtp"') == {4}
         assert small_ruleset.metadata_dict[4]['disabled'] is True
+
+
+class TestMultiValuedKeys:
+    """A token matches a rule if ANY of the rule's values for that key satisfies it."""
+
+    @pytest.fixture
+    def rs(self):
+        rules = make_rule(1, metadata="created_at 2018-01-01, created_at 2020-01-01, cve 2017-0001, cve 2021-0001, "
+                                      "risk_score 10, risk_score 90, priority low, priority high") + "\n" + \
+            make_rule(2, metadata="created_at 2019-06-01, cve 2019-0001, risk_score 50, priority medium") + "\n"
+        return Ruleset(rules)
+
+    def test_each_range_side_matches_via_different_values(self, rs):
+        assert f(rs, '"created_at > 2019-01-01"') == {1, 2}
+        assert f(rs, '"created_at < 2019-01-01"') == {1}
+        assert f(rs, '"created_at > 2019-01-01" AND "created_at < 2019-01-01"') == {1}
+        assert f(rs, '"cve >= 2020-0000"') == {1}
+        assert f(rs, '"cve < 2018-0000"') == {1}
+        assert f(rs, '"risk_score >= 90"') == {1}
+        assert f(rs, '"risk_score < 20"') == {1}
+        # each token is satisfied independently (10 < 60 and 90 > 20), so rule 1 matches too
+        assert f(rs, '"risk_score > 20" AND "risk_score < 60"') == {1, 2}
+
+    def test_negation_applies_to_the_whole_rule(self, rs):
+        # NOT means "no value satisfies", i.e. the complement of the match set
+        assert f(rs, 'NOT "created_at > 2019-01-01"') == set()
+        assert f(rs, 'NOT "created_at < 2019-01-01"') == {2}
+        assert f(rs, 'NOT "priority high"') == {2}
+
+    def test_exact_values(self, rs):
+        assert f(rs, '"priority low"') == {1}
+        assert f(rs, '"priority high"') == {1}
+        assert f(rs, '"priority low" AND "priority high"') == {1}
+        assert f(rs, '"cve 2017-0001" OR "cve 2019-0001"') == {1, 2}
+
+    def test_single_rule_counted_once(self, rs):
+        result = rs.filter_ruleset('"priority <ALL>" OR "created_at > 2000-01-01" OR "risk_score > 0"')
+        assert sorted(result) == [1, 2]
+
+
+class TestResultContract:
+    def test_no_duplicates_and_only_known_sids(self, small_ruleset):
+        result = small_ruleset.filter_ruleset('"protocols <ALL>" OR "priority high" OR NOT "cve <ALL>"')
+        assert len(result) == len(set(result))
+        assert set(result) <= SMALL_SIDS
+
+    def test_result_is_a_list(self, small_ruleset):
+        assert isinstance(small_ruleset.filter_ruleset('"priority high"'), list)
+        assert isinstance(small_ruleset.filter_ruleset('"priority nosuchvalue"'), list)
+
+    def test_repeated_calls_are_stable_and_independent(self, small_ruleset):
+        a = set(small_ruleset.filter_ruleset('"priority high" AND "protocols tcp"'))
+        b = set(small_ruleset.filter_ruleset('NOT "priority high"'))
+        c = set(small_ruleset.filter_ruleset('"priority high" AND "protocols tcp"'))
+        assert a == c == {1, 2}
+        assert b == SMALL_SIDS - {1, 2, 6}
+
+    def test_filter_reflects_metadata_added_after_construction(self, small_ruleset):
+        assert f(small_ruleset, '"verdict benign"') == set()
+        small_ruleset.add_metadata(5, "verdict", "benign")
+        small_ruleset.add_metadata(1, "protocols", "udp")
+        assert f(small_ruleset, '"verdict benign"') == {5}
+        assert f(small_ruleset, '"protocols udp"') == {1, 5}
+        assert f(small_ruleset, 'NOT "verdict benign"') == SMALL_SIDS - {5}
 
 
 class TestAllAndBareKey:
@@ -94,11 +158,11 @@ class TestAllAndBareKey:
 
 class TestUnknownKeysAndValues:
     def test_unknown_key_returns_nothing_with_warning(self, small_ruleset, caplog):
-        assert small_ruleset.filter_ruleset('"nosuchkey value"') == []
+        assert set(small_ruleset.filter_ruleset('"nosuchkey value"')) == set()
         assert "metadata key 'nosuchkey' not found in ruleset" in caplog.text
 
     def test_unknown_value_returns_nothing_with_warning(self, small_ruleset, caplog):
-        assert small_ruleset.filter_ruleset('"priority nosuchvalue"') == []
+        assert set(small_ruleset.filter_ruleset('"priority nosuchvalue"')) == set()
         assert "metadata key-value pair 'priority nosuchvalue' not found in ruleset" in caplog.text
 
     def test_not_unknown_key_returns_all(self, small_ruleset):
@@ -248,7 +312,7 @@ class TestFloatRanges:
 
     def test_range_operator_on_non_range_key_is_literal(self, small_ruleset, caplog):
         # '>' is only special for range keys; for other keys it is part of the value
-        assert small_ruleset.filter_ruleset('"priority > high"') == []
+        assert set(small_ruleset.filter_ruleset('"priority > high"')) == set()
         assert "not found in ruleset" in caplog.text
 
 
@@ -328,19 +392,19 @@ class TestFilterSources:
 
     def test_set_metadata_filter_string(self, small_ruleset):
         small_ruleset.set_metadata_filter('"protocols dns"')
-        assert small_ruleset.filter_ruleset() == [5]
+        assert set(small_ruleset.filter_ruleset()) == {5}
 
     def test_argument_overrides_stored_filter(self, small_ruleset):
         small_ruleset.set_metadata_filter('"protocols dns"')
         assert set(small_ruleset.filter_ruleset('"priority high"')) == {1, 2, 6}
         # stored filter unchanged
-        assert small_ruleset.filter_ruleset() == [5]
+        assert set(small_ruleset.filter_ruleset()) == {5}
 
     def test_filter_file_with_comments_and_blank_lines(self, small_ruleset, tmp_path):
         p = tmp_path / "x.filter"
         p.write_text("# leading comment\n\n   # indented comment\n(\n  \"priority high\"\n  # inline-ish comment line\n  AND \"protocols http\"\n)\n\n")
         small_ruleset.set_metadata_filter(str(p))
-        assert small_ruleset.filter_ruleset() == [1]
+        assert set(small_ruleset.filter_ruleset()) == {1}
         assert small_ruleset.enable_all_rules is False
 
     def test_filter_file_enable_all_rules_directive(self, small_rules_str, tmp_path):
@@ -349,7 +413,7 @@ class TestFilterSources:
         rs = Ruleset(small_rules_str, metadata_filter=str(p))
         assert rs.enable_all_rules is True
         assert rs.get_disabled_sids() == []
-        assert rs.filter_ruleset() == [4]
+        assert set(rs.filter_ruleset()) == {4}
         assert rs.metadata_dict[4]['disabled'] is False
         assert rs.metadata_dict[4]['originally_disabled'] is True
 
@@ -367,14 +431,14 @@ class TestFilterSources:
         rs = Ruleset(small_rules_str, metadata_filter=str(p))
         assert rs.enable_all_rules is True
         assert rs.metadata_filter == '"protocols smtp"\n'
-        assert rs.filter_ruleset() == [4]
+        assert set(rs.filter_ruleset()) == {4}
 
     def test_enable_all_rules_directive_with_filter_on_same_line(self, small_rules_str, tmp_path):
         p = tmp_path / "x.filter"
         p.write_text('<enable-all-rules> "protocols smtp"\n')
         rs = Ruleset(small_rules_str, metadata_filter=str(p))
         assert rs.enable_all_rules is True
-        assert rs.filter_ruleset() == [4]
+        assert set(rs.filter_ruleset()) == {4}
 
     def test_non_file_path_is_treated_as_literal_filter(self, small_ruleset, tmp_path):
         small_ruleset.set_metadata_filter(str(tmp_path))  # a directory, so not loaded as a file
@@ -436,7 +500,7 @@ class TestExampleFilters:
                 ('high' in md['priority'] and ({'http', 'tls'} & set(md['protocols'])))
 
     def test_sid_filter_on_example_ruleset(self, example_ruleset):
-        assert example_ruleset.filter_ruleset('"sid 80181444"') == [80181444]
+        assert set(example_ruleset.filter_ruleset('"sid 80181444"')) == {80181444}
 
     def test_cve_and_date_filters_consistent(self, example_ruleset):
         newer = set(example_ruleset.filter_ruleset('"cve >= 2018-0000"'))

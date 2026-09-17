@@ -134,7 +134,9 @@ Install the development dependencies and run the test suite with ``pytest``:
     pytest --cov   # with coverage report
 
 Tests that load the large ``examples/example.rules`` file are marked ``examples``
-and can be skipped with ``pytest -m "not examples"``.
+and can be skipped with ``pytest -m "not examples"``.  Benchmarks (marked ``slow``)
+are skipped unless ``pytest --run-slow -s`` is used; they print load and filter
+timings that can be compared before and after performance changes.
 
 License
 =======

@@ -218,10 +218,10 @@ class TestDuplicateSids:
         assert rs.keys_dict['foo']['bar'] == []
         assert rs.keys_dict['priority']['high'] == [1]
         assert rs.keys_dict['originally_disabled']['true'] == []
-        assert rs.filter_ruleset('"priority low"') == []
-        assert rs.filter_ruleset('"foo bar"') == []
-        assert rs.filter_ruleset('"priority high"') == [1]
-        assert rs.filter_ruleset('"originally_disabled true"') == []
+        assert set(rs.filter_ruleset('"priority low"')) == set()
+        assert set(rs.filter_ruleset('"foo bar"')) == set()
+        assert set(rs.filter_ruleset('"priority high"')) == {1}
+        assert set(rs.filter_ruleset('"originally_disabled true"')) == set()
 
     def test_all_disabled_duplicates_keeps_first(self):
         rules = make_rule(1, msg="first", disabled=True) + "\n" + make_rule(1, msg="second", disabled=True) + "\n"

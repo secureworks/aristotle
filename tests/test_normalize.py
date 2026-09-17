@@ -65,7 +65,7 @@ class TestNormalizeOption:
 
     def test_normalized_dates_usable_in_range_filters(self, small_rules_str):
         rs = Ruleset(small_rules_str, normalize=True)
-        assert rs.filter_ruleset('"updated_at >= 2020-01-01"') == [7]
+        assert set(rs.filter_ruleset('"updated_at >= 2020-01-01"')) == {7}
 
     def test_normalize_multi_cve_value(self):
         rs = Ruleset(make_rule(1, metadata="cve cve_2021_27561_cve_2021_27562, priority low") + "\n", normalize=True)
@@ -75,7 +75,7 @@ class TestNormalizeOption:
     def test_normalize_keeps_sid_internally(self, small_rules_str):
         rs = Ruleset(small_rules_str, normalize=True)
         assert rs.metadata_dict[1]['metadata']['sid'] == ['1']
-        assert rs.filter_ruleset('"sid 1"') == [1]
+        assert set(rs.filter_ruleset('"sid 1"')) == {1}
 
 
 @pytest.mark.examples
