@@ -58,7 +58,7 @@ if (sys.version_info < (3, 2)):
 rule_re = re.compile(
     r"^(?P<HEADER>(?P<ACTION>pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\s+"
     r"(?P<PROTO>[^\s]+)\s+(?P<SRCIP>[^\s]+)\s+(?P<SRCPORT>[^\s]+)\s+(?P<DIRECTION>[\x2D\x3C]\x3E)\s+(?P<DSTIP>[^\s]+)\s+(?P<DSTPORT>[^\s]+))\s+"
-    r"\x28(?P<BODY>[^\x29]+)"
+    r"\x28(?P<BODY>.+)\x29\s*$"
 )
 # Note: TODO? could have a generic re for keyword with a placeholder for the name; conflate with one in _pfmod_apply()
 disabled_rule_re = re.compile(r"^\x23\s*(?:pass|drop|reject|alert|sdrop|log|rejectsrc|rejectdst|rejectboth)\x20.*[\x28\x3B]\s*sid\s*\x3A\s*\d+\s*\x3B.*\x29$")
@@ -71,7 +71,8 @@ target_keyword_re = re.compile(r"[\x28\x3B]\s*target\s*\x3A\s*(?P<TARGET>[^\x3B]
 rule_msg_re = re.compile(r"[\s\x3B\x28]msg\s*\x3A\s*\x22(?P<MSG>[^\x22]+?)\x22\s*\x3B")
 cve_re = re.compile(r"(?:19|20)\d{2}\x2D(?:0\d{3}|[1-9]\d{3,})")
 cve_re_broad = re.compile(r"\bcve\x2D\d{4}\x2D\d+\b", flags=re.I)
-mitre_attack_url_re = re.compile(r"attack\x2Emitre\x2Eorg\x2F(?:techniques|datasources|groups|software|campaigns)\x2F(?:TA|DS|[TGSC])\d+(?:\x2F\d+)?")
+cve_reference_re = re.compile(r"[\x28\x3B]\s*reference\s*\x3A\s*cve\s*\x2C\s*(?P<CVE>\d{4}\x2D\d+)", flags=re.I)
+mitre_attack_url_re = re.compile(r"attack\x2Emitre\x2Eorg\x2F(?:tactics|techniques|datasources|groups|software|campaigns)\x2F(?:TA|DS|[TGSC])\d+(?:\x2F\d+)?")
 eol_re = re.compile(r"\x29\s*$")
 
 ipval_cache = {}
@@ -245,7 +246,7 @@ class Ruleset():
                         if line.lstrip().lower().startswith("<enable-all-rules>"):
                             print_debug("Enabling all rules.")
                             self.enable_all_rules = True
-                            line = line[len("<enable-all-rules>"):].lstrip()
+                            line = line.lstrip()[len("<enable-all-rules>"):].lstrip()
                         # strip out comments and ignore blank lines
                         if line.strip().startswith('#') or len(line.strip()) == 0:
                             continue
@@ -278,7 +279,7 @@ class Ruleset():
         if ipval in return_values:
             return ipval
         if len(ipval) < 2:
-            print_error("Bad IPVAR found: {}".format(ipval))
+            print_error("Bad IPVAR found: {}".format(ipval), fatal=False)
             return unknown
         # check cache. Testing shows using a cache doesn't speed things up....
         cached_val = ipval_cache.get(ipval)
@@ -293,7 +294,7 @@ class Ruleset():
             ipval = ipval[1:-1]
         brackets = [c for c in ipval if c == '[']
         if len(brackets) > 0:
-            print_error("Double nested ipval found: {}.  Cannot reduce".format(original_val))
+            print_error("Double nested ipval found: {}.  Cannot reduce".format(original_val), fatal=False)
             return unknown
         ipval_list = [v.strip() for v in ipval.split(',')]
         reduced_ipval = self._reduce_ipval_helper(ipval_list, global_negate=negated)
@@ -316,7 +317,7 @@ class Ruleset():
                          "$ICCP_SERVER", "$ENIP_CLIENT", "$ENIP_SERVER", "$MODBUS_CLIENT", "$MODBUS_SERVER"]
         external_net_vars = ["$EXTERNAL_NET", "$RFC1918", "$GOTOMYPC", "$AIM_SERVERS"]
         # add CG-NAT (100.64.0.0/10)?
-        known_localnet_ips = ["10.0.0.0/8", "192.168.0.0/24", "172.16.0.0/12", "127.0.0.0/8", "255.255.255.255"]
+        known_localnet_ips = ["10.0.0.0/8", "192.168.0.0/16", "172.16.0.0/12", "127.0.0.0/8", "255.255.255.255"]
         unknown = "UNDETERMINED"
         rfc1918_found = False
         if 'any' in vals:
@@ -326,7 +327,7 @@ class Ruleset():
             if v[0] == '!':
                 negated = not global_negate
                 v = v[1:]
-            # Assume variable ending in "_SERVERS" is HOME_NET unless already listed as in EXTERNAL_NET
+            # Assume variable ending in "_NET" is HOME_NET unless already listed as in EXTERNAL_NET
             if v not in external_net_vars and v not in home_net_vars and v.endswith("_NET"):
                 home_net_vars.append(v)
             if not negated:
@@ -340,7 +341,7 @@ class Ruleset():
                 if v in external_net_vars:
                     return "$HOME_NET"
             if v.startswith('$'):
-                print_error("Unclassified variable found in _reduce_ipval_helper(): '{}'".format(v))
+                print_error("Unclassified variable found in _reduce_ipval_helper(): '{}'".format(v), fatal=False)
                 return unknown
             # this *should* be an IP or CIDR block
             if v in known_localnet_ips and not negated:
@@ -374,6 +375,8 @@ class Ruleset():
             if cves:
                 for cve in cves:
                     self.add_metadata(sid, "cve", cve[4:])
+            for cve in cve_reference_re.findall(rule):
+                self.add_metadata(sid, "cve", cve)
 
             # find MITRE ATT&CK URL references, extract the values, and add as metadata
             mitres = mitre_attack_url_re.findall(rule)
@@ -678,6 +681,9 @@ class Ruleset():
                         continue
                     if self.metadata_dict[sid]['disabled']:
                         print_warning("Ignoring disabled rule with duplicate sid: {}".format(self.metadata_dict[sid]['raw_rule']))
+                        # purge the replaced rule's entries from keys_dict so filters don't match on its metadata
+                        for k in list(self.metadata_dict[sid]['metadata'].keys()):
+                            self.delete_metadata(sid, k)
                     else:
                         print_warning("Ignoring rule with duplicate sid: {}".format(line))
                         continue
@@ -920,7 +926,8 @@ class Ruleset():
             if v.endswith('/i'):
                 re_flag = re.I
                 re_v = v[:-1]
-            re_v = re_v.strip('/')
+            # only remove the delimiting slashes; strip('/') would also eat a trailing escaped slash in the pattern
+            re_v = re_v[1:-1]
             try:
                 pattern_re = re.compile(r"{}".format(re_v), flags=re_flag)
             except Exception as e:
@@ -953,6 +960,11 @@ class Ruleset():
 
     def evaluate(self, myobj):
         """Recursive evaluation function that deals with BooleanAlgebra elements from boolean.py."""
+        # simplify() can reduce the whole expression to a constant, e.g. '"x" AND NOT "x"'
+        if isinstance(myobj, boolean.boolean._TRUE):
+            return self.get_all_sids()
+        if isinstance(myobj, boolean.boolean._FALSE):
+            return []
         if myobj.isliteral:
             if isinstance(myobj, boolean.boolean.NOT):
                 return self.get_sids(self.metadata_map[myobj.args[0].obj], negate=True)
@@ -992,7 +1004,7 @@ class Ruleset():
         # handle multi-word tokens (and doesn't support quoting). So
         # just replace and map to single word. This way we can still
         # leverage boolean.py to do simplifying and building of the tree.
-        mytokens = re.findall(r'\x22[a-zA-Z0-9_]+[^\x22]+\x22', metadata_filter, re.DOTALL)
+        mytokens = re.findall(r'\x22\s*[a-zA-Z0-9_]+[^\x22]+\x22', metadata_filter, re.DOTALL)
         if not mytokens or len(mytokens) == 0:
             # nothing to filter on so exit
             print_error("metadata_filter string contains no tokens", fatal=True)
@@ -1107,22 +1119,22 @@ class Ruleset():
                     for action in rule['actions']:
                         if type(action) == str:
                             if action not in valid_actions_str:
-                                print_error("Invalid action '{}' in PFMod rule named '{}'. Supported str actions are: {}.".format(action, rule_name, valid_actions_str))
+                                print_error("Invalid action '{}' in PFMod rule named '{}'. Supported str actions are: {}.".format(action, rule_name, valid_actions_str), fatal=False)
                                 continue
                             if action == 'disable':
                                 self.metadata_dict[sid]['disabled'] = True
                             elif action == 'enable':
                                 self.metadata_dict[sid]['disabled'] = False
                             else:
-                                print_error("Action not implemented: '{}'.".format(action))
+                                print_error("Action not implemented: '{}'.".format(action), fatal=False)
                                 continue
                         elif type(action) == dict:
                             for action_key in action.keys():
                                 action_key = action_key.strip()
                                 if action_key not in valid_actions_dict and not action_key.startswith("set_"):
-                                    print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict))
+                                    print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict), fatal=False)
                                     continue
-                                if len(str(action[action_key]).strip()) == 0:
+                                if action[action_key] is None or len(str(action[action_key]).strip()) == 0:
                                     print_error("No value for action '{}'.".format(action_key), fatal=True)
 
                                 if action_key == "copy_key":
@@ -1135,7 +1147,7 @@ class Ruleset():
                                         new_key = a[1]
                                         if key == new_key:
                                             print_error("Invalid action found: '{}' in PFMod rule named '{}'. Old and new keyword names are both '{}'. "
-                                                        " You are doing it wrong.".format(action_key, rule_name, key))
+                                                        " You are doing it wrong.".format(action_key, rule_name, key), fatal=False)
                                             continue
                                         # check if key exists
                                         if key not in self.metadata_dict[sid]['metadata'].keys():
@@ -1156,8 +1168,8 @@ class Ruleset():
                                     key = action_key.split('_', 1)[1]
                                     print_debug("PFMod: setting '{}' metadata key on SID {} ...".format(key, sid))
                                     key_value = str(action[action_key]).strip()
-                                    if len(key_value) > 1:
-                                        if key_value[0] in ['+', '-']:
+                                    if len(key_value) > 0:
+                                        if len(key_value) > 1 and key_value[0] in ['+', '-']:
                                             key_value_orig = key_value
                                             r = [x.strip() for x in key_value.split(',')]
                                             default_value = None
@@ -1181,8 +1193,8 @@ class Ruleset():
                                                 try:
                                                     existing_value = int(existing_value)
                                                 except Exception as e:
-                                                    print_error("PFMod rule named '{}', action '{}': invalid exiting metadata value '{}' for key '{}' in SID '{}' (must be an integer).  "
-                                                                "Skipping.  Error:\n{}".format(rule_name, action_key, existing_value, key, sid, e))
+                                                    print_error("PFMod rule named '{}', action '{}': invalid existing metadata value '{}' for key '{}' in SID '{}' (must be an integer).  "
+                                                                "Skipping.  Error:\n{}".format(rule_name, action_key, existing_value, key, sid, e), fatal=False)
                                                     continue
                                                 key_value = existing_value + key_value
                                             else:
@@ -1231,7 +1243,7 @@ class Ruleset():
                                 elif action_key.startswith("set_"):
                                     keyword = action_key.split('_')[1]
                                     if keyword not in valid_set_keywords.keys():
-                                        print_error("Invalid PFMod action '{}'.  Setting keyword '{}' not supported.".format(action_key, keyword))
+                                        print_error("Invalid PFMod action '{}'.  Setting keyword '{}' not supported.".format(action_key, keyword), fatal=False)
                                         continue
                                     print_debug("PFMod: setting '{}' keyword on SID {} ...".format(keyword, sid))
                                     keyword_value = str(action[action_key]).strip()
@@ -1301,18 +1313,24 @@ class Ruleset():
                                         self.metadata_dict[sid]['raw_rule'] = eol_re.sub(keyword_string, self.metadata_dict[sid]['raw_rule'])
 
                                 elif action_key == "regex_sub":
-                                    v = action[action_key]
+                                    v = str(action[action_key]).strip()
+                                    if not (v.startswith('/') and (v.endswith('/') or v.endswith('/i'))):
+                                        print_error("Bad {} value '{}' in PFMod rule named '{}'. Value must be in the format "
+                                                    "'/pattern/replacement/' or '/pattern/replacement/i'.".format(action_key, v, rule_name), fatal=False)
+                                        continue
                                     re_flag = 0
                                     re_v = v
-                                    if v.endswith('i'):
+                                    if v.endswith('/i'):
                                         re_flag = re.I
                                         re_v = v[:-1]
+                                    re_v = re_v[1:-1]
                                     try:
-                                        search_string, replace_string = re_v.strip().strip('/').split('/', 1)
+                                        # split on the first '/' that isn't backslash-escaped so patterns can contain '\/'
+                                        search_string, replace_string = re.split(r"(?<!\\)/", re_v, 1)
                                         pattern_re = re.compile(r"{}".format(search_string), flags=re_flag)
                                         self.metadata_dict[sid]['raw_rule'] = pattern_re.sub(r'{}'.format(replace_string), self.metadata_dict[sid]['raw_rule'])
                                     except Exception as e:
-                                        print_error("Problem processing '{}' value '{}' in PFMod rule named '{}': {}".format(action_key, v, rule_name, e))
+                                        print_error("Problem processing '{}' value '{}' in PFMod rule named '{}': {}".format(action_key, v, rule_name, e), fatal=False)
                                         continue
 
                                 else:
@@ -1320,7 +1338,7 @@ class Ruleset():
                                     print_error("Invalid action found: '{}' in PFMod rule named '{}'. Supported dict actions are: '{}'.".format(action, rule_name, valid_actions_dict), fatal=True)
                                 # print_debug("Handled '{}' Action: '{}'. Value: '{}'".format(action_key, action, action[action_key]))
                         else:
-                            print_error("Invalid action data type '{}' in PFMod rule named '{}'.".format(type(action), rule_name))
+                            print_error("Invalid action data type '{}' in PFMod rule named '{}'.".format(type(action), rule_name), fatal=False)
                             continue
         return matched_sids_all
 
@@ -1422,20 +1440,17 @@ class Ruleset():
         print("")
         # ignore disabled rules when printing summary
         enabled_sids = [s for s in sids if not self.metadata_dict[s]['disabled']]
-        i = 0
-        while i < len(enabled_sids):
-            if i < self.summary_max:
-                matchobj = rule_msg_re.search(self.metadata_dict[enabled_sids[i]]['raw_rule'])
-                if not matchobj:
-                    print_warning("Unable to extract rule msg from '{}'.".format(self.metadata_dict[enabled_sids[i]]['raw_rule']))
-                    continue
-                msg = matchobj.group("MSG")
-                print("{} [sid:{}]".format(msg, enabled_sids[i]))
+        shown_sids = enabled_sids[:max(self.summary_max, 0)]
+        for s in shown_sids:
+            matchobj = rule_msg_re.search(self.metadata_dict[s]['raw_rule'])
+            if not matchobj:
+                print_warning("Unable to extract rule msg from '{}'.".format(self.metadata_dict[s]['raw_rule']))
+                msg = ""
             else:
-                break
-            i += 1
+                msg = matchobj.group("MSG")
+            print("{} [sid:{}]".format(msg, s))
         print("\n" + BLUE + "Showing {} of {} enabled rules{}".format(
-            i,
+            len(shown_sids),
             len(enabled_sids),
             " ({} rules total, including disabled)".format(len(sids)) if len(sids) != len(enabled_sids) else '') + RESET)
         if pfmod_sids is not None and len(sids) > 0:

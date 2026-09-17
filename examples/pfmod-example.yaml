@@ -42,6 +42,6 @@ rules:
   - name: disable-informational-and-audit
     filter_string: >-
       "signature_severity informational" OR "signature_severity audit"
-      OR "msg_regex /INFORMATIONAL/i" OR "rule_regex /[\s\x3B\x28]priority\s*\x3A\s*5\s*\x3B"
+      OR "msg_regex /INFORMATIONAL/i" OR "rule_regex /[\s\x3B\x28]priority\s*\x3A\s*5\s*\x3B/"
     actions:
       - disable

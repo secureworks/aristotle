@@ -122,6 +122,20 @@ Usage
     -f '(("priority high" AND "malware <ALL>") AND "created_at >= 2018-01-01")
     AND NOT ("protocols smtp" OR "protocols pop" OR "protocols imap") OR "sid 80181444"'
 
+Testing
+=======
+
+Install the development dependencies and run the test suite with ``pytest``:
+
+.. code:: console
+
+    pip install -r requirements-dev.txt
+    pytest
+    pytest --cov   # with coverage report
+
+Tests that load the large ``examples/example.rules`` file are marked ``examples``
+and can be skipped with ``pytest -m "not examples"``.
+
 License
 =======
 
