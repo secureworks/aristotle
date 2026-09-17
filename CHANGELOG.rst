@@ -51,8 +51,8 @@ Bug Fixes:
   - The enabling of modify_metadata automatically if unset when a PFMod file is given wasn't being honored when running as a script.
   - Empty PFMod YAML entries were not always being handled properly.
 
-Unreleased
-##########
+2.1.2 (2026-09-17)
+##################
 
 Added:
 
