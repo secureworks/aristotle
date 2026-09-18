@@ -110,6 +110,13 @@ Supported ``actions`` are:
     flow              set_flow       ``set_flow: "established,to_server"``
     ================  =============  ===================================================================
 
+   .. note::
+       ``set_sid`` replaces the value of the ``sid`` keyword in the rule text, but Aristotle continues to identify the rule
+       internally by its original SID. As a result, ``filter_string`` values in subsequent PFMod rules that use the ``sid``
+       key, as well as summary output and statistics, still refer to the original SID; and unless ``normalize`` is enabled,
+       the ``sid`` metadata key written to the rule on output will also contain the original SID rather than the new one.
+       Aristotle does not check whether the new SID collides with an existing one.
+
 -  ``set_<arbitrary_integer_metadata>`` -- similar to ``add_metadata_exclusive``, allows for the setting or changing of an arbitrary
    integer-based metadata key value, but also supports relative values along with default values.
 
