@@ -74,6 +74,8 @@ cve_re_broad = re.compile(r"\bcve\x2D\d{4}\x2D\d+\b", flags=re.I)
 cve_reference_re = re.compile(r"[\x28\x3B]\s*reference\s*\x3A\s*cve\s*\x2C\s*(?P<CVE>\d{4}\x2D\d+)", flags=re.I)
 mitre_attack_url_re = re.compile(r"attack\x2Emitre\x2Eorg\x2F(?:tactics|techniques|datasources|groups|software|campaigns)\x2F(?:TA|DS|[TGSC])\d+(?:\x2F\d+)?")
 eol_re = re.compile(r"\x29\s*$")
+# separates a protocol prefix from the rest of a keyword name, e.g. 'http.uri', 'dns_query'
+keyword_prefix_re = re.compile(r"[\x2E\x5F]")
 
 ipval_cache = {}
 
@@ -103,6 +105,15 @@ else:
     YELLOW = ""
     BLUE = ""
     UNDERLINE = ""
+
+
+def parse_date(value):
+    """Parse a date string into a datetime. The common YYYY-MM-DD form is tried
+    first since it is much faster than the general dateutil parser."""
+    try:
+        return datetime.datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return dateparse(value)
 
 
 def print_error(msg, fatal=True):
@@ -415,12 +426,12 @@ class Ruleset():
                 proto = match_obj.group("ALPROTO").lower().strip()
                 if not proto.startswith('!') and proto != "failed":
                     self.add_metadata(sid, "protocols", proto)
-            # check keywords known to be associated with particular protocols
+            # check keywords known to be associated with particular protocols, e.g. 'http.uri' or 'dns_query'
             known_protocols = ['http', 'dns', 'tls', 'ssh', 'snmp', 'sip', 'rfb', 'mqtt', 'http2',
                                'ja3', 'dnp3', 'cip', 'enip', 'ftpdata', 'krb5', ]
+            keyword_prefixes = set(keyword_prefix_re.split(k, 1)[0] for k in keywords if keyword_prefix_re.search(k))
             for app_proto in known_protocols:
-                htest = [k for k in keywords if k.startswith("{}_".format(app_proto)) or k.startswith("{}.".format(app_proto))]
-                if len(htest) > 0:
+                if app_proto in keyword_prefixes:
                     if app_proto == "ja3":
                         app_proto = "tls"
                     elif app_proto == "cip":
@@ -530,7 +541,7 @@ class Ruleset():
         if k.endswith("_at") or k.endswith("-at"):
             # treat as possible date
             try:
-                v = dateparse(v.replace('_', '-'))
+                v = parse_date(v.replace('_', '-'))
                 v = v.strftime("%Y-%m-%d")
             except Exception as e:
                 print_warning("Unable to parse metadata '{}' key with value '{}' as date{}: {}".format(k, v, " for sid {}".format(sid) if sid is not None else "", e))
@@ -744,9 +755,6 @@ class Ruleset():
                     for current_kvp in kvs:
                         k, v = current_kvp
                         self.add_metadata(sid, k, v)
-                    for k in self.metadata_dict[sid]['metadata'].keys():
-                        # remove duplicate values for the same key
-                        self.metadata_dict[sid]['metadata'][k] = list(set(self.metadata_dict[sid]['metadata'][k]))
 
                 # add sid as pseudo metadata key unless it already exists
                 if 'sid' not in self.metadata_dict[sid]['metadata'].keys():
@@ -909,7 +917,7 @@ class Ruleset():
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
                     # compare each distinct value once rather than once per rule
                     retarray = [s for val, val_sids in self.keys_dict.get(k, {}).items() if val_sids
-                                and lbound < dateparse(val) < ubound
+                                and lbound < parse_date(val) < ubound
                                 for s in val_sids]
                 except Exception as e:
                     print_error("Unable to process '{}' value '{}' (as datetime):\n{}".format(k, v, e), fatal=True)
