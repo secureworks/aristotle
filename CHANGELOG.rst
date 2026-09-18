@@ -89,6 +89,10 @@ Bug Fixes:
 Unreleased
 ##########
 
+Bug Fixes:
+
+  - When a PFMod action changed a rule's text (``set_msg``, ``set_classtype``, or a ``regex_sub`` affecting either), the ``filter_string`` of subsequent PFMod rules still matched the original ``msg`` (via ``msg_regex``) and ``classtype`` values, contrary to the documented top-to-bottom ordering behavior.  Both are now updated along with the rule text, and the ``classtype`` change is reflected in the ``metadata`` keyword on output when ``modify_metadata`` is enabled.
+
 Performance:
 
   - The internal key-value-pair index (``Ruleset.keys_dict``) now maps each value to a ``set`` of SIDs instead of a ``list``.  Adding a metadata key-value pair previously scanned the existing SID list for that pair, which made ruleset loading quadratic in the number of rules sharing a value; loading a 70,000 rule ruleset with ``enhance`` and ``normalize`` dropped from about 150 seconds to under 40.  Code that reads ``keys_dict`` directly and expects lists (e.g. indexing or ``.count()``) will need to be updated.

@@ -628,17 +628,32 @@ class Ruleset():
                     self.keys_dict[key][value].discard(sid)
 
     def _set_raw_rule(self, sid, rule):
-        """ Replace the raw rule text for the given sid and forget any cached
-            regex filter results for it, since they may no longer be accurate.
+        """ Replace the raw rule text for the given sid and bring everything derived
+            from the rule text up to date, so that subsequent filters (e.g. later PFMod
+            rules) see the change: cached regex filter results for the sid are forgotten,
+            and the 'msg' field and 'classtype' pseudo metadata key are re-extracted.
 
             :param sid: sid to update
             :type sid: int, required
             :param rule: new raw rule text
             :type rule: string, required
         """
+        old_rule = self.metadata_dict[sid]['raw_rule']
         self.metadata_dict[sid]['raw_rule'] = rule
         for memo in self._regex_cache.values():
             memo.pop(sid, None)
+        matchobj = rule_msg_re.search(rule)
+        self.metadata_dict[sid]['msg'] = matchobj.group("MSG") if matchobj else ""
+        if not self.ignore_classtype_keyword:
+            old_classtype = classtype_keyword_re.search(old_rule)
+            new_classtype = classtype_keyword_re.search(rule)
+            old_classtype = old_classtype.group("CLASSTYPE") if old_classtype else None
+            new_classtype = new_classtype.group("CLASSTYPE") if new_classtype else None
+            if old_classtype != new_classtype:
+                if old_classtype:
+                    self.delete_metadata(sid, 'classtype', old_classtype)
+                if new_classtype:
+                    self.add_metadata(sid, 'classtype', new_classtype)
 
     def parse_rules(self, rules, filename=None):
         """Parses the given rules and builds/updates necessary data structures.

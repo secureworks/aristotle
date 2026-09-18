@@ -141,8 +141,10 @@ Supported ``actions`` are:
 .. note::
     PFMod ``rules`` and ``actions`` are applied in the order they are processed -- from top to bottom of the file. This
     means that, depending on how the rules and actions are written, subsequent rules and actions can affect changes
-    made by previous rules and actions.  Remember too that the files included with the ``include`` key are processed
-    before any ``rules`` directives, resulting in a depth-first search type of behavior.
+    made by previous rules and actions.  Changes to the rule text made by an action (e.g. ``regex_sub``, ``set_msg``,
+    ``set_classtype``) are visible to the ``filter_string`` of subsequent PFMod rules, including ``msg_regex``,
+    ``rule_regex``, and the ``classtype`` pseudo metadata key.  Remember too that the files included with the
+    ``include`` key are processed before any ``rules`` directives, resulting in a depth-first search type of behavior.
 
 Example PFMod YAML Files
 ------------------------

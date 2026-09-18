@@ -552,3 +552,87 @@ class TestRegexFiltersSeeEarlierModifications:
         rs, matched = apply(["disable"], sids=[1, 2], filter_string='"msg_regex /Acme/"')
         assert matched == {1, 2}
         assert not rs.metadata_dict[3]['disabled']
+
+
+class TestRuleTextChangesUpdateDerivedFields:
+    """msg and classtype are derived from the rule text; PFMod actions that change the text must update them."""
+
+    def test_set_msg_is_seen_by_later_msg_regex(self, apply):
+        yaml_text = ("rules:\n"
+                     "  - filter_string: '\"sid 1\"'\n"
+                     "    actions:\n"
+                     "      - set_msg: 'Zeta - Renamed Beacon'\n"
+                     "  - filter_string: '\"msg_regex /^Zeta - Renamed/\"'\n"
+                     "    actions:\n"
+                     "      - add_metadata: 'seen renamed'\n"
+                     "  - filter_string: '\"msg_regex /Malware CnC Beacon/\"'\n"
+                     "    actions: [disable]\n")
+        rs, _ = apply([], yaml_text=yaml_text)
+        assert rs.metadata_dict[1]['msg'] == 'Zeta - Renamed Beacon'
+        assert rs.metadata_dict[1]['metadata']['seen'] == ['renamed']
+        assert rs.metadata_dict[1]['disabled'] is False
+
+    def test_regex_sub_on_msg_is_seen_by_later_msg_regex(self, apply):
+        yaml_text = ("rules:\n"
+                     "  - filter_string: '\"sid 5\"'\n"
+                     "    actions:\n"
+                     "      - regex_sub: '/DNS Query Suspicious/DNS Lookup Evil/'\n"
+                     "  - filter_string: '\"msg_regex /Lookup Evil/\"'\n"
+                     "    actions: [disable]\n")
+        rs, matched = apply([], yaml_text=yaml_text)
+        assert matched == {5}
+        assert rs.metadata_dict[5]['msg'] == 'Acme - DNS Lookup Evil Domain'
+        assert rs.metadata_dict[5]['disabled'] is True
+
+    def test_set_classtype_is_seen_by_later_filter_and_output(self, apply, tmp_path):
+        yaml_text = ("rules:\n"
+                     "  - filter_string: '\"sid 1\"'\n"
+                     "    actions:\n"
+                     "      - set_classtype: 'command-and-control'\n"
+                     "  - filter_string: '\"classtype command-and-control\"'\n"
+                     "    actions:\n"
+                     "      - add_metadata: 'seen c2'\n"
+                     "  - filter_string: '\"classtype trojan-activity\"'\n"
+                     "    actions: [disable]\n")
+        rs, _ = apply([], yaml_text=yaml_text)
+        assert rs.metadata_dict[1]['metadata']['classtype'] == ['command-and-control']
+        assert rs.metadata_dict[1]['metadata']['seen'] == ['c2']
+        assert rs.metadata_dict[1]['disabled'] is False
+        assert 1 in rs.keys_dict['classtype']['command-and-control']
+        assert 1 not in rs.keys_dict['classtype']['trojan-activity']
+        out = tmp_path / "out.rules"
+        rs.output_rules([1], outfile=str(out))
+        line = out.read_text()
+        assert "classtype:command-and-control;" in line
+        assert "classtype command-and-control" in line
+        assert "trojan-activity" not in line
+
+    def test_classtype_added_by_regex_sub_when_rule_had_none(self, apply):
+        # sid 5 has no classtype keyword
+        yaml_text = ("rules:\n"
+                     "  - filter_string: '\"sid 5\"'\n"
+                     "    actions:\n"
+                     "      - regex_sub: '/sid:5;/classtype:bad-unknown; sid:5;/'\n"
+                     "  - filter_string: '\"classtype bad-unknown\"'\n"
+                     "    actions: [disable]\n")
+        rs, matched = apply([], yaml_text=yaml_text)
+        assert matched == {5}
+        assert rs.metadata_dict[5]['metadata']['classtype'] == ['bad-unknown']
+
+    def test_classtype_ignored_when_option_set(self, apply):
+        yaml_text = ("rules:\n"
+                     "  - filter_string: '\"sid 1\"'\n"
+                     "    actions:\n"
+                     "      - set_classtype: 'command-and-control'\n")
+        rs, _ = apply([], yaml_text=yaml_text, ignore_classtype_keyword=True)
+        assert 'classtype' not in rs.metadata_dict[1]['metadata']
+
+    def test_unrelated_text_change_keeps_explicit_classtype_metadata(self, apply):
+        # a classtype added as metadata by PFMod (not via the keyword) must survive later text edits
+        yaml_text = ("rules:\n"
+                     "  - filter_string: '\"sid 1\"'\n"
+                     "    actions:\n"
+                     "      - add_metadata: 'classtype extra-tag'\n"
+                     "      - set_priority: 4\n")
+        rs, _ = apply([], yaml_text=yaml_text)
+        assert sorted(rs.metadata_dict[1]['metadata']['classtype']) == ['extra-tag', 'trojan-activity']
