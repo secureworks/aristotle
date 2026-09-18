@@ -507,3 +507,48 @@ class TestExamplePfmodFiles:
         assert matched == set(sids)
         for s in sids:
             assert rs.metadata_dict[s]['metadata']['confidence'] == ['unknown']
+
+
+class TestRegexFiltersSeeEarlierModifications:
+    """Regex filter results are cached per rule; a later PFMod rule must still see text changed by an earlier one."""
+
+    def test_rule_regex_matches_text_changed_by_earlier_regex_sub(self, apply):
+        yaml_text = ("rules:\n"
+                     "  - filter_string: '\"sid 1\"'\n"
+                     "    actions:\n"
+                     "      - regex_sub: '/^alert\\x20/drop /'\n"
+                     "  - filter_string: '\"rule_regex /^drop\\x20/\"'\n"
+                     "    actions: [disable]\n")
+        rs, matched = apply([], yaml_text=yaml_text)
+        assert matched == {1}
+        assert rs.metadata_dict[1]['disabled'] is True
+
+    def test_rule_regex_stops_matching_text_removed_by_earlier_regex_sub(self, apply):
+        yaml_text = ("rules:\n"
+                     "  - filter_string: '\"rule_regex /^alert\\x20/\" AND \"sid 1\"'\n"
+                     "    actions:\n"
+                     "      - add_metadata: 'seen first'\n"
+                     "      - regex_sub: '/^alert\\x20/drop /'\n"
+                     "  - filter_string: '\"rule_regex /^alert\\x20/\"'\n"
+                     "    actions: [disable]\n")
+        rs, _ = apply([], yaml_text=yaml_text)
+        assert rs.metadata_dict[1]['metadata']['seen'] == ['first']
+        assert rs.metadata_dict[1]['disabled'] is False
+        assert all(rs.metadata_dict[s]['disabled'] for s in rs.get_all_sids() if s != 1)
+
+    def test_rule_regex_sees_keyword_set_by_earlier_rule(self, apply):
+        yaml_text = ("rules:\n"
+                     "  - filter_string: '\"sid 5\"'\n"
+                     "    actions:\n"
+                     "      - set_priority: 9\n"
+                     "  - filter_string: '\"rule_regex /priority:9;/\"'\n"
+                     "    actions:\n"
+                     "      - add_metadata: 'found priority-nine'\n")
+        rs, matched = apply([], yaml_text=yaml_text)
+        assert matched == {5}
+        assert rs.metadata_dict[5]['metadata']['found'] == ['priority-nine']
+
+    def test_only_scoped_sids_are_considered(self, apply):
+        rs, matched = apply(["disable"], sids=[1, 2], filter_string='"msg_regex /Acme/"')
+        assert matched == {1, 2}
+        assert not rs.metadata_dict[3]['disabled']
