@@ -86,8 +86,8 @@ Bug Fixes:
   - Leading whitespace inside a quoted filter string token (e.g. ``"  priority high"``) caused the token to be ignored.
   - The RFC 1918 block ``192.168.0.0/16`` was listed as ``192.168.0.0/24`` when reducing IP values for ``detection_direction``.
 
-Unreleased
-##########
+2.2.0 (2026-09-18)
+##################
 
 Bug Fixes:
 
