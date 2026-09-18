@@ -87,7 +87,7 @@ class TestMetadataActions:
     def test_add_metadata_new_key(self, apply):
         rs, _ = apply(['add_metadata: "confidence unknown"'], filter_string='"sid 1"')
         assert rs.metadata_dict[1]['metadata']['confidence'] == ['unknown']
-        assert rs.keys_dict['confidence']['unknown'] == [1]
+        assert rs.keys_dict['confidence']['unknown'] == {1}
 
     def test_add_metadata_existing_key_keeps_both_values(self, apply):
         rs, _ = apply(['add_metadata: "confidence unknown"'], filter_string='"sid 3"')
@@ -104,7 +104,7 @@ class TestMetadataActions:
     def test_add_metadata_exclusive_overwrites(self, apply):
         rs, _ = apply(['add_metadata_exclusive: "confidence unknown"'], filter_string='"sid 3"')
         assert rs.metadata_dict[3]['metadata']['confidence'] == ['unknown']
-        assert rs.keys_dict['confidence']['high'] == []
+        assert rs.keys_dict['confidence']['high'] == set()
 
     def test_add_metadata_single_word_raises(self, apply):
         with pytest.raises(AristotleException, match="Invalid value for action 'add_metadata'"):
@@ -146,7 +146,7 @@ class TestCopyKey:
         rs, _ = apply(['copy_key: "protocols proto_orig"'], filter_string='"sid 1"')
         assert set(rs.metadata_dict[1]['metadata']['proto_orig']) == {'http', 'tcp'}
         assert rs.metadata_dict[1]['metadata']['protocols'] == rs.metadata_dict[1]['metadata']['protocols']
-        assert rs.keys_dict['proto_orig']['http'] == [1]
+        assert rs.keys_dict['proto_orig']['http'] == {1}
 
     def test_existing_destination_not_overwritten(self, apply, caplog):
         rs, _ = apply(['copy_key: "risk_score priority"'], filter_string='"sid 1"')
@@ -343,7 +343,7 @@ class TestSetArbitraryIntegerMetadata:
     def test_absolute_value(self, apply):
         rs, _ = apply(["set_risk_score: 42"], filter_string='"sid 1"')
         assert self.md(rs, 1) == ['42']
-        assert rs.keys_dict['risk_score']['42'] == [1]
+        assert rs.keys_dict['risk_score']['42'] == {1}
         assert 1 not in rs.keys_dict['risk_score']['90']
 
     def test_single_character_value(self, apply):

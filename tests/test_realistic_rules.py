@@ -54,7 +54,7 @@ class TestNormalization:
 
     def test_cve_metadata_normalized_and_merged_with_reference(self, rs):
         assert rs.metadata_dict[9000002]['metadata']['cve'] == ['2009-4179']
-        assert rs.keys_dict['cve']['2009-4179'] == [9000002]
+        assert rs.keys_dict['cve']['2009-4179'] == {9000002}
 
     def test_mitre_ids_mapped_to_mitre_attack(self, rs):
         assert set(rs.metadata_dict[9000003]['metadata']['mitre_attack']) == {'ta0011', 't1071'}

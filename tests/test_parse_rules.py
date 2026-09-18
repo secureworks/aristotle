@@ -90,7 +90,7 @@ class TestCommentsAndDisabledRules:
     def test_originally_disabled_metadata(self, small_ruleset):
         assert small_ruleset.metadata_dict[4]['metadata']['originally_disabled'] == ['true']
         assert small_ruleset.metadata_dict[1]['metadata']['originally_disabled'] == ['false']
-        assert small_ruleset.keys_dict['originally_disabled']['true'] == [4]
+        assert small_ruleset.keys_dict['originally_disabled']['true'] == {4}
 
     def test_enable_all_rules(self, small_rules_str):
         rs = Ruleset(small_rules_str, enable_all_rules=True)
@@ -102,7 +102,7 @@ class TestCommentsAndDisabledRules:
     def test_originally_disabled_in_rule_metadata_is_overridden(self, caplog):
         rs = Ruleset(make_rule(1, metadata="originally_disabled true, priority low") + "\n")
         assert rs.metadata_dict[1]['metadata']['originally_disabled'] == ['false']
-        assert rs.keys_dict['originally_disabled'].get('true', []) == []
+        assert rs.keys_dict['originally_disabled'].get('true', set()) == set()
         assert "internal metadata key" in caplog.text
 
 
@@ -112,7 +112,7 @@ class TestMetadataParsing:
         md = rs.metadata_dict[1]['metadata']
         assert md['priority'] == ['high']
         assert md['attack_target'] == ['http-server']
-        assert rs.keys_dict['priority']['high'] == [1]
+        assert rs.keys_dict['priority']['high'] == {1}
 
     def test_multi_value_keys(self, small_ruleset):
         assert set(small_ruleset.metadata_dict[1]['metadata']['protocols']) == {'http', 'tcp'}
@@ -121,7 +121,7 @@ class TestMetadataParsing:
     def test_duplicate_values_deduplicated(self):
         rs = Ruleset(make_rule(1, metadata="cve 2017-1, cve 2017-1, cve 2017-1") + "\n")
         assert rs.metadata_dict[1]['metadata']['cve'] == ['2017-1']
-        assert rs.keys_dict['cve']['2017-1'] == [1]
+        assert rs.keys_dict['cve']['2017-1'] == {1}
 
     def test_single_word_metadata_ignored_with_warning(self, caplog):
         rs = Ruleset(make_rule(1, metadata="priority high, orphan") + "\n")
@@ -137,12 +137,12 @@ class TestMetadataParsing:
 
     def test_sid_pseudo_key(self, small_ruleset):
         assert small_ruleset.metadata_dict[3]['metadata']['sid'] == ['3']
-        assert small_ruleset.keys_dict['sid']['3'] == [3]
+        assert small_ruleset.keys_dict['sid']['3'] == {3}
 
     def test_sid_metadata_key_present_and_matching(self):
         rs = Ruleset(make_rule(42, metadata="sid 42, priority low") + "\n")
         assert rs.metadata_dict[42]['metadata']['sid'] == ['42']
-        assert rs.keys_dict['sid']['42'] == [42]
+        assert rs.keys_dict['sid']['42'] == {42}
 
     def test_sid_metadata_key_mismatch_warns(self, caplog):
         Ruleset(make_rule(42, metadata="sid 43, priority low") + "\n")
@@ -150,7 +150,7 @@ class TestMetadataParsing:
 
     def test_classtype_keyword_added_as_metadata(self, small_ruleset):
         assert small_ruleset.metadata_dict[1]['metadata']['classtype'] == ['trojan-activity']
-        assert small_ruleset.keys_dict['classtype']['trojan-activity'] == [1]
+        assert small_ruleset.keys_dict['classtype']['trojan-activity'] == {1}
         assert 'classtype' not in small_ruleset.metadata_dict[5]['metadata']
 
     def test_classtype_keyword_only_first_used_and_merged_with_metadata(self):
@@ -214,10 +214,10 @@ class TestDuplicateSids:
         rules = make_rule(1, msg="first", metadata="priority low, foo bar", disabled=True) + "\n" + \
             make_rule(1, msg="second", metadata="priority high") + "\n"
         rs = Ruleset(rules)
-        assert rs.keys_dict['priority']['low'] == []
-        assert rs.keys_dict['foo']['bar'] == []
-        assert rs.keys_dict['priority']['high'] == [1]
-        assert rs.keys_dict['originally_disabled']['true'] == []
+        assert rs.keys_dict['priority']['low'] == set()
+        assert rs.keys_dict['foo']['bar'] == set()
+        assert rs.keys_dict['priority']['high'] == {1}
+        assert rs.keys_dict['originally_disabled']['true'] == set()
         assert set(rs.filter_ruleset('"priority low"')) == set()
         assert set(rs.filter_ruleset('"foo bar"')) == set()
         assert set(rs.filter_ruleset('"priority high"')) == {1}

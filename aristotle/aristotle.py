@@ -170,7 +170,7 @@ class Ruleset():
         """Constructor."""
         # dict keys are sids
         self.metadata_dict = {}
-        # dict keys are keys from metadata key-value pairs
+        # dict keys are keys from metadata key-value pairs; each value maps to the set of SIDs having that key-value pair
         self.keys_dict = {'sid': {}}
         # dict keys are hash of key-value pairs from passed in filter string/file
         self.metadata_map = {}
@@ -576,9 +576,8 @@ class Ruleset():
         if key not in self.keys_dict.keys():
             self.keys_dict[key] = {}
         if value not in self.keys_dict[key].keys():
-            self.keys_dict[key][value] = []
-        if sid not in self.keys_dict[key][value]:
-            self.keys_dict[key][value].append(sid)
+            self.keys_dict[key][value] = set()
+        self.keys_dict[key][value].add(sid)
 
     def delete_metadata(self, sid, key, value=None):
         """ Update self.metadata_dict and self.keys_dict data structures for the
@@ -605,16 +604,14 @@ class Ruleset():
                 print_debug("key '{}' not found in sid '{}', cannot delete.".format(key, sid))
             if key in self.keys_dict.keys():
                 for value in self.keys_dict[key].keys():
-                    if sid in self.keys_dict[key][value]:
-                        self.keys_dict[key][value].remove(sid)
+                    self.keys_dict[key][value].discard(sid)
         else:
             if key in self.metadata_dict[sid]['metadata'].keys():
                 if value in self.metadata_dict[sid]['metadata'][key]:
                     self.metadata_dict[sid]['metadata'][key].remove(value)
             if key in self.keys_dict.keys():
                 if value in self.keys_dict[key].keys():
-                    if sid in self.keys_dict[key][value]:
-                        self.keys_dict[key][value].remove(sid)
+                    self.keys_dict[key][value].discard(sid)
 
     def parse_rules(self, rules, filename=None):
         """Parses the given rules and builds/updates necessary data structures.
@@ -738,7 +735,7 @@ class Ruleset():
                     # keys and values are strings; variable "sid" is int so must
                     # be cast as str when used the same way other keys and values are used.
                     self.metadata_dict[sid]['metadata']['sid'] = [str(sid)]
-                    self.keys_dict['sid'][str(sid)] = [sid]
+                    self.keys_dict['sid'][str(sid)] = {sid}
 
                 # add 'originally_disabled' as pseudo metadata key so it can be filtered on
                 if 'originally_disabled' in self.metadata_dict[sid]['metadata'].keys():
@@ -952,7 +949,7 @@ class Ruleset():
                     # retarray should stil be empty but in case not:
                     retarray = []
                 else:
-                    retarray = [s for s in self.keys_dict[k][v]]
+                    retarray = list(self.keys_dict[k][v])
         if negate:
             # if key or value not found, this will be all rules
             retarray = list(frozenset(self.get_all_sids()) - frozenset(retarray))
@@ -1381,6 +1378,7 @@ class Ruleset():
         sids_orig = sids
         if sids is None:
             sids = list(self.metadata_dict.keys())
+        sids_set = set(sids)
         if key not in self.keys_dict.keys():
             print_warning("key '{}' not found".format(key))
             return
@@ -1399,8 +1397,8 @@ class Ruleset():
                     total = len(self.keys_dict[key][value])
                     enabled = len([sid for sid in self.keys_dict[key][value] if not self.metadata_dict[sid]['disabled']])
                 else:
-                    total = len([s for s in sids if s in self.keys_dict[key][value]])
-                    enabled = len([sid for sid in self.keys_dict[key][value] if sid in sids and not self.metadata_dict[sid]['disabled']])
+                    total = len(self.keys_dict[key][value] & sids_set)
+                    enabled = len([sid for sid in self.keys_dict[key][value] if sid in sids_set and not self.metadata_dict[sid]['disabled']])
                 disabled = total - enabled
                 if include_empty_substat or total > 0:
                     retstr += "\t{} (Total: {}; Enabled: {}; Disabled: {})\n".format(ORANGE + value + RESET, total, enabled, disabled)

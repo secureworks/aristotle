@@ -58,7 +58,7 @@ class TestNormalizeOption:
     def test_normalize_dates_and_mitre_in_ruleset(self, small_rules_str):
         rs = Ruleset(small_rules_str, normalize=True)
         assert rs.metadata_dict[7]['metadata']['updated_at'] == ['2020-01-15']
-        assert rs.keys_dict['updated_at']['2020-01-15'] == [7]
+        assert rs.keys_dict['updated_at']['2020-01-15'] == {7}
         assert rs.metadata_dict[6]['metadata']['mitre_attack'] == ['t1190']
         assert 'mitre_technique_id' not in rs.metadata_dict[6]['metadata']
         assert 'mitre_technique_id' not in rs.keys_dict

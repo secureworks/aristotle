@@ -85,3 +85,10 @@ Bug Fixes:
   - ``examples/pfmod-example.yaml`` contained a ``rule_regex`` pattern missing its closing ``/``.
   - Leading whitespace inside a quoted filter string token (e.g. ``"  priority high"``) caused the token to be ignored.
   - The RFC 1918 block ``192.168.0.0/16`` was listed as ``192.168.0.0/24`` when reducing IP values for ``detection_direction``.
+
+Unreleased
+##########
+
+Performance:
+
+  - The internal key-value-pair index (``Ruleset.keys_dict``) now maps each value to a ``set`` of SIDs instead of a ``list``.  Adding a metadata key-value pair previously scanned the existing SID list for that pair, which made ruleset loading quadratic in the number of rules sharing a value; loading a 70,000 rule ruleset with ``enhance`` and ``normalize`` dropped from about 150 seconds to under 40.  Code that reads ``keys_dict`` directly and expects lists (e.g. indexing or ``.count()``) will need to be updated.
