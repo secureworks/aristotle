@@ -74,6 +74,8 @@ cve_re_broad = re.compile(r"\bcve\x2D\d{4}\x2D\d+\b", flags=re.I)
 cve_reference_re = re.compile(r"[\x28\x3B]\s*reference\s*\x3A\s*cve\s*\x2C\s*(?P<CVE>\d{4}\x2D\d+)", flags=re.I)
 mitre_attack_url_re = re.compile(r"attack\x2Emitre\x2Eorg\x2F(?:tactics|techniques|datasources|groups|software|campaigns)\x2F(?:TA|DS|[TGSC])\d+(?:\x2F\d+)?")
 eol_re = re.compile(r"\x29\s*$")
+# separates a protocol prefix from the rest of a keyword name, e.g. 'http.uri', 'dns_query'
+keyword_prefix_re = re.compile(r"[\x2E\x5F]")
 
 ipval_cache = {}
 
@@ -103,6 +105,15 @@ else:
     YELLOW = ""
     BLUE = ""
     UNDERLINE = ""
+
+
+def parse_date(value):
+    """Parse a date string into a datetime. The common YYYY-MM-DD form is tried
+    first since it is much faster than the general dateutil parser."""
+    try:
+        return datetime.datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return dateparse(value)
 
 
 def print_error(msg, fatal=True):
@@ -170,10 +181,13 @@ class Ruleset():
         """Constructor."""
         # dict keys are sids
         self.metadata_dict = {}
-        # dict keys are keys from metadata key-value pairs
+        # dict keys are keys from metadata key-value pairs; each value maps to the set of SIDs having that key-value pair
         self.keys_dict = {'sid': {}}
         # dict keys are hash of key-value pairs from passed in filter string/file
         self.metadata_map = {}
+        # results of 'msg_regex' and 'rule_regex' filter terms: {(key, pattern): {sid: matched (bool)}}.
+        # A rule's entries are dropped when its raw rule changes (see _set_raw_rule()).
+        self._regex_cache = {}
 
         self.enable_all_rules = enable_all_rules
         self.output_disabled_rules = output_disabled_rules
@@ -412,12 +426,12 @@ class Ruleset():
                 proto = match_obj.group("ALPROTO").lower().strip()
                 if not proto.startswith('!') and proto != "failed":
                     self.add_metadata(sid, "protocols", proto)
-            # check keywords known to be associated with particular protocols
+            # check keywords known to be associated with particular protocols, e.g. 'http.uri' or 'dns_query'
             known_protocols = ['http', 'dns', 'tls', 'ssh', 'snmp', 'sip', 'rfb', 'mqtt', 'http2',
                                'ja3', 'dnp3', 'cip', 'enip', 'ftpdata', 'krb5', ]
+            keyword_prefixes = set(keyword_prefix_re.split(k, 1)[0] for k in keywords if keyword_prefix_re.search(k))
             for app_proto in known_protocols:
-                htest = [k for k in keywords if k.startswith("{}_".format(app_proto)) or k.startswith("{}.".format(app_proto))]
-                if len(htest) > 0:
+                if app_proto in keyword_prefixes:
                     if app_proto == "ja3":
                         app_proto = "tls"
                     elif app_proto == "cip":
@@ -527,7 +541,7 @@ class Ruleset():
         if k.endswith("_at") or k.endswith("-at"):
             # treat as possible date
             try:
-                v = dateparse(v.replace('_', '-'))
+                v = parse_date(v.replace('_', '-'))
                 v = v.strftime("%Y-%m-%d")
             except Exception as e:
                 print_warning("Unable to parse metadata '{}' key with value '{}' as date{}: {}".format(k, v, " for sid {}".format(sid) if sid is not None else "", e))
@@ -576,9 +590,8 @@ class Ruleset():
         if key not in self.keys_dict.keys():
             self.keys_dict[key] = {}
         if value not in self.keys_dict[key].keys():
-            self.keys_dict[key][value] = []
-        if sid not in self.keys_dict[key][value]:
-            self.keys_dict[key][value].append(sid)
+            self.keys_dict[key][value] = set()
+        self.keys_dict[key][value].add(sid)
 
     def delete_metadata(self, sid, key, value=None):
         """ Update self.metadata_dict and self.keys_dict data structures for the
@@ -605,16 +618,42 @@ class Ruleset():
                 print_debug("key '{}' not found in sid '{}', cannot delete.".format(key, sid))
             if key in self.keys_dict.keys():
                 for value in self.keys_dict[key].keys():
-                    if sid in self.keys_dict[key][value]:
-                        self.keys_dict[key][value].remove(sid)
+                    self.keys_dict[key][value].discard(sid)
         else:
             if key in self.metadata_dict[sid]['metadata'].keys():
                 if value in self.metadata_dict[sid]['metadata'][key]:
                     self.metadata_dict[sid]['metadata'][key].remove(value)
             if key in self.keys_dict.keys():
                 if value in self.keys_dict[key].keys():
-                    if sid in self.keys_dict[key][value]:
-                        self.keys_dict[key][value].remove(sid)
+                    self.keys_dict[key][value].discard(sid)
+
+    def _set_raw_rule(self, sid, rule):
+        """ Replace the raw rule text for the given sid and bring everything derived
+            from the rule text up to date, so that subsequent filters (e.g. later PFMod
+            rules) see the change: cached regex filter results for the sid are forgotten,
+            and the 'msg' field and 'classtype' pseudo metadata key are re-extracted.
+
+            :param sid: sid to update
+            :type sid: int, required
+            :param rule: new raw rule text
+            :type rule: string, required
+        """
+        old_rule = self.metadata_dict[sid]['raw_rule']
+        self.metadata_dict[sid]['raw_rule'] = rule
+        for memo in self._regex_cache.values():
+            memo.pop(sid, None)
+        matchobj = rule_msg_re.search(rule)
+        self.metadata_dict[sid]['msg'] = matchobj.group("MSG") if matchobj else ""
+        if not self.ignore_classtype_keyword:
+            old_classtype = classtype_keyword_re.search(old_rule)
+            new_classtype = classtype_keyword_re.search(rule)
+            old_classtype = old_classtype.group("CLASSTYPE") if old_classtype else None
+            new_classtype = new_classtype.group("CLASSTYPE") if new_classtype else None
+            if old_classtype != new_classtype:
+                if old_classtype:
+                    self.delete_metadata(sid, 'classtype', old_classtype)
+                if new_classtype:
+                    self.add_metadata(sid, 'classtype', new_classtype)
 
     def parse_rules(self, rules, filename=None):
         """Parses the given rules and builds/updates necessary data structures.
@@ -624,6 +663,8 @@ class Ruleset():
         :param filename: if the passed in rules came from a file, the filename of that file
         :type filename: string, optional
         """
+        # (re)loading rules invalidates any cached regex filter results
+        self._regex_cache = {}
         try:
             for lineno, line in enumerate(rules.splitlines()):
                 # ignore comments and blank lines
@@ -729,16 +770,13 @@ class Ruleset():
                     for current_kvp in kvs:
                         k, v = current_kvp
                         self.add_metadata(sid, k, v)
-                    for k in self.metadata_dict[sid]['metadata'].keys():
-                        # remove duplicate values for the same key
-                        self.metadata_dict[sid]['metadata'][k] = list(set(self.metadata_dict[sid]['metadata'][k]))
 
                 # add sid as pseudo metadata key unless it already exists
                 if 'sid' not in self.metadata_dict[sid]['metadata'].keys():
                     # keys and values are strings; variable "sid" is int so must
                     # be cast as str when used the same way other keys and values are used.
                     self.metadata_dict[sid]['metadata']['sid'] = [str(sid)]
-                    self.keys_dict['sid'][str(sid)] = [sid]
+                    self.keys_dict['sid'][str(sid)] = {sid}
 
                 # add 'originally_disabled' as pseudo metadata key so it can be filtered on
                 if 'originally_disabled' in self.metadata_dict[sid]['metadata'].keys():
@@ -830,18 +868,22 @@ class Ruleset():
         """
         return [s for s in self.metadata_dict.keys() if self.metadata_dict[s]['disabled']]
 
-    def get_sids(self, kvpair, negate=False):
+    def get_sids(self, kvpair, negate=False, candidates=None):
         """Get a list of all SIDs for passed in key-value pair.
 
         :param kvpair: key-value pair
         :type kvpair: string, required
         :param negate: returns the inverse of the result (i.e. all SIDs not matching the ``kvpair``), defaults to `False`
         :type negate: bool, optional
+        :param candidates: only consider (and return) these SIDs; defaults to all SIDs in the ruleset
+        :type candidates: set, optional
         :returns: list of matching SIDs
         :rtype: list
         :raises: `AristotleException`
         """
         k, v = [e.strip() for e in kvpair.split(' ', 1)]
+        if candidates is None:
+            candidates = set(self.metadata_dict.keys())
         retarray = []
         # these keys support '>', '<', '>=', and '<='
         rangekeys = ['sid',
@@ -865,9 +907,10 @@ class Ruleset():
                     cmp_operator = v[:offset]
                     cve_val = v[offset:].strip()
                     print_debug("cmp_operator: {}, cve_val: {}".format(cmp_operator, cve_val))
-                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
-                                for val in self.metadata_dict[s]["metadata"][k]
-                                if self.cve_compare(left_val=val, right_val=cve_val, cmp_operator=cmp_operator)]
+                    # compare each distinct value once rather than once per rule
+                    retarray = [s for val, val_sids in self.keys_dict.get(k, {}).items() if val_sids
+                                and self.cve_compare(left_val=val, right_val=cve_val, cmp_operator=cmp_operator)
+                                for s in val_sids]
                 except Exception as e:
                     print_error("Unable to process key '{}' value '{}' (as CVE number):\n{}".format(k, v, e), fatal=True)
             elif k in ["created_at", "updated_at"]:
@@ -887,9 +930,10 @@ class Ruleset():
                         lbound = dateparse(v[offset:].strip())
                         lbound -= datetime.timedelta(microseconds=(offset - 1))
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
-                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
-                                for val in self.metadata_dict[s]["metadata"][k]
-                                if (dateparse(val) < ubound and dateparse(val) > lbound)]
+                    # compare each distinct value once rather than once per rule
+                    retarray = [s for val, val_sids in self.keys_dict.get(k, {}).items() if val_sids
+                                and lbound < parse_date(val) < ubound
+                                for s in val_sids]
                 except Exception as e:
                     print_error("Unable to process '{}' value '{}' (as datetime):\n{}".format(k, v, e), fatal=True)
             else:
@@ -911,10 +955,11 @@ class Ruleset():
                             lbound_inclusive = True
                         lbound = float(v[offset:].strip())
                     print_debug("lbound: {}\nubound: {}".format(lbound, ubound))
-                    retarray = [s for s in [s2 for s2 in self.metadata_dict.keys() if k in self.metadata_dict[s2]["metadata"].keys()]
-                                for val in self.metadata_dict[s]["metadata"][k]
-                                if (float(val) < ubound or (ubound_inclusive and float(val) == ubound))
-                                and (float(val) > lbound or (lbound_inclusive and float(val) == lbound))]
+                    # compare each distinct value once rather than once per rule
+                    retarray = [s for val, val_sids in self.keys_dict.get(k, {}).items() if val_sids
+                                and (float(val) < ubound or (ubound_inclusive and float(val) == ubound))
+                                and (float(val) > lbound or (lbound_inclusive and float(val) == lbound))
+                                for s in val_sids]
                 except Exception as e:
                     print_error("Unable to process '{}' value '{}' (as float):\n{}".format(k, v, e), fatal=True)
         elif k in ["msg_regex", "rule_regex"]:
@@ -932,12 +977,16 @@ class Ruleset():
                 pattern_re = re.compile(r"{}".format(re_v), flags=re_flag)
             except Exception as e:
                 print_error("Unable to compile RegEx pattern '{}': {}".format(v, e), fatal=True)
+            # regex matching is by far the most expensive filter operation, so remember the
+            # result for each rule; only rules in 'candidates' that haven't been seen are searched.
+            field = 'msg' if k == "msg_regex" else 'raw_rule'
+            memo = self._regex_cache.setdefault((k, v), {})
             try:
-                if k == "msg_regex":
-                    retarray = [s for s in self.metadata_dict.keys() if pattern_re.search(self.metadata_dict[s]['msg'])]
-                else:
-                    # match against raw rule
-                    retarray = [s for s in self.metadata_dict.keys() if pattern_re.search(self.metadata_dict[s]['raw_rule'])]
+                for s in candidates:
+                    if s not in memo:
+                        memo[s] = pattern_re.search(self.metadata_dict[s][field]) is not None
+                    if memo[s]:
+                        retarray.append(s)
             except Exception as e:
                 print_error("Problem matching RegEx pattern '{}': {}".format(v, e), fatal=True)
         else:
@@ -952,38 +1001,59 @@ class Ruleset():
                     # retarray should stil be empty but in case not:
                     retarray = []
                 else:
-                    retarray = [s for s in self.keys_dict[k][v]]
+                    retarray = list(self.keys_dict[k][v])
         if negate:
-            # if key or value not found, this will be all rules
-            retarray = list(frozenset(self.get_all_sids()) - frozenset(retarray))
-        return list(set(retarray))
+            # if key or value not found, this will be all (candidate) rules
+            return list(candidates - set(retarray))
+        return list(candidates & set(retarray))
 
-    def evaluate(self, myobj):
-        """Recursive evaluation function that deals with BooleanAlgebra elements from boolean.py."""
+    def _evaluation_cost(self, myobj):
+        """Sort key used to order the terms of an AND: indexed key-value terms (0) are evaluated
+        before sub-expressions (1), and regex terms (2) last so they only run against the rules
+        that survived the cheaper terms."""
+        if not myobj.isliteral:
+            return 1
+        symbol = myobj.args[0] if isinstance(myobj, boolean.boolean.NOT) else myobj
+        if self.metadata_map[symbol.obj].startswith(("msg_regex ", "rule_regex ")):
+            return 2
+        return 0
+
+    def evaluate(self, myobj, candidates=None):
+        """Recursive evaluation function that deals with BooleanAlgebra elements from boolean.py.
+
+        :param myobj: (sub)expression to evaluate
+        :type myobj: boolean.Expression, required
+        :param candidates: only consider these SIDs; defaults to all SIDs in the ruleset
+        :type candidates: set, optional
+        :returns: set of matching SIDs
+        :rtype: set
+        """
+        if candidates is None:
+            candidates = set(self.metadata_dict.keys())
         # simplify() can reduce the whole expression to a constant, e.g. '"x" AND NOT "x"'
         if isinstance(myobj, boolean.boolean._TRUE):
-            return self.get_all_sids()
+            return set(candidates)
         if isinstance(myobj, boolean.boolean._FALSE):
-            return []
+            return set()
         if myobj.isliteral:
             if isinstance(myobj, boolean.boolean.NOT):
-                return self.get_sids(self.metadata_map[myobj.args[0].obj], negate=True)
+                return set(self.get_sids(self.metadata_map[myobj.args[0].obj], negate=True, candidates=candidates))
             else:
-                return self.get_sids(self.metadata_map[myobj.obj])
+                return set(self.get_sids(self.metadata_map[myobj.obj], candidates=candidates))
         elif isinstance(myobj, boolean.boolean.OR):
-            retlist = []
-            for i in range(0, len(myobj.args)):
-                retlist = list(set(retlist + self.evaluate(myobj.args[i])))
-            return retlist
+            retset = set()
+            for arg in myobj.args:
+                retset.update(self.evaluate(arg, candidates))
+            return retset
         elif isinstance(myobj, boolean.boolean.AND):
-            retlist = list(frozenset(self.evaluate(myobj.args[0])))
-            for i in range(1, len(myobj.args)):
-                retlist = list(frozenset(retlist).intersection(self.evaluate(myobj.args[i])))
-            return retlist
+            # each term narrows the candidates for the next; cheap terms go first
+            for arg in sorted(myobj.args, key=self._evaluation_cost):
+                candidates = self.evaluate(arg, candidates)
+            return candidates
         # not reached
         return None
 
-    def filter_ruleset(self, metadata_filter=None):
+    def filter_ruleset(self, metadata_filter=None, sids=None):
         """Applies boolean filter against the ruleset and returns list of matching SIDs.
 
         :param metadata_filter: A string that defines the desired outcome based on
@@ -991,6 +1061,8 @@ class Ruleset():
             Boolean algebra. Defaults to ``self.metadata_filter`` which must be set
             if this parameter is not set.
         :type metadata_filter: string, optional
+        :param sids: only consider these SIDs; defaults to all SIDs in the ruleset
+        :type sids: list, optional
         :returns: list of matching SIDs
         :rtype: list
         :raises: `AristotleException`
@@ -1032,7 +1104,8 @@ class Ruleset():
         try:
             algebra = boolean.BooleanAlgebra()
             mytree = algebra.parse(metadata_filter).literalize().simplify()
-            return self.evaluate(mytree)
+            candidates = set(self.metadata_dict.keys()) if sids is None else set(sids)
+            return list(self.evaluate(mytree, candidates))
         except Exception as e:
             print_error("Problem processing metadata_filter string:\n\n{}\n\nError:\n{}".format(metadata_filter_original, e), fatal=True)
 
@@ -1107,11 +1180,10 @@ class Ruleset():
                         print_error("No '{}' defined for PFMod rule '{}'".format(k, rule_name), fatal=True)
                 # print_debug("Filter String: {}".format(rule['filter_string']))
                 try:
-                    matched_sids = self.filter_ruleset(rule['filter_string'])
+                    matched_sids = self.filter_ruleset(rule['filter_string'], sids=sids)
                 except Exception as e:
                     print_error("Unable to apply filter string '{}' in PFMod rule named '{}': {}.".format(rule['filter_string'], rule_name, e), fatal=True)
                 # print_debug("matched_sids: {}\npassed sids: {}".format(matched_sids, sids))
-                matched_sids = list(set(sids) & set(matched_sids))
                 matched_sids_all.update(matched_sids)
                 # print_debug("Matched sids: {}".format(matched_sids))
                 print_debug("Rule:\n\t{}\n\tModified: {}".format(rule_name, len(matched_sids)))
@@ -1305,12 +1377,12 @@ class Ruleset():
                                     keyword_re = re.compile(keyword_re_template.format(keyword))
                                     if keyword_re.search(self.metadata_dict[sid]['raw_rule']):
                                         print_debug("PFMod: Overwriting keyword '{}' with value '{}' for SID {}.".format(keyword, keyword_value, sid))
-                                        self.metadata_dict[sid]['raw_rule'] = keyword_re.sub(r'\g<PRE>' + str(keyword_value) + ';', self.metadata_dict[sid]['raw_rule'])
+                                        self._set_raw_rule(sid, keyword_re.sub(r'\g<PRE>' + str(keyword_value) + ';', self.metadata_dict[sid]['raw_rule']))
                                     else:
                                         # given keyword not in original rule; add one.
                                         print_debug("PFMod: Adding keyword '{}' with value '{}' for SID {}.".format(keyword, keyword_value, sid))
                                         keyword_string = " {}:{};)".format(keyword, keyword_value)
-                                        self.metadata_dict[sid]['raw_rule'] = eol_re.sub(keyword_string, self.metadata_dict[sid]['raw_rule'])
+                                        self._set_raw_rule(sid, eol_re.sub(keyword_string, self.metadata_dict[sid]['raw_rule']))
 
                                 elif action_key == "regex_sub":
                                     v = str(action[action_key]).strip()
@@ -1328,7 +1400,7 @@ class Ruleset():
                                         # split on the first '/' that isn't backslash-escaped so patterns can contain '\/'
                                         search_string, replace_string = re.split(r"(?<!\\)/", re_v, 1)
                                         pattern_re = re.compile(r"{}".format(search_string), flags=re_flag)
-                                        self.metadata_dict[sid]['raw_rule'] = pattern_re.sub(r'{}'.format(replace_string), self.metadata_dict[sid]['raw_rule'])
+                                        self._set_raw_rule(sid, pattern_re.sub(r'{}'.format(replace_string), self.metadata_dict[sid]['raw_rule']))
                                     except Exception as e:
                                         print_error("Problem processing '{}' value '{}' in PFMod rule named '{}': {}".format(action_key, v, rule_name, e), fatal=False)
                                         continue
@@ -1381,6 +1453,7 @@ class Ruleset():
         sids_orig = sids
         if sids is None:
             sids = list(self.metadata_dict.keys())
+        sids_set = set(sids)
         if key not in self.keys_dict.keys():
             print_warning("key '{}' not found".format(key))
             return
@@ -1399,8 +1472,8 @@ class Ruleset():
                     total = len(self.keys_dict[key][value])
                     enabled = len([sid for sid in self.keys_dict[key][value] if not self.metadata_dict[sid]['disabled']])
                 else:
-                    total = len([s for s in sids if s in self.keys_dict[key][value]])
-                    enabled = len([sid for sid in self.keys_dict[key][value] if sid in sids and not self.metadata_dict[sid]['disabled']])
+                    total = len(self.keys_dict[key][value] & sids_set)
+                    enabled = len([sid for sid in self.keys_dict[key][value] if sid in sids_set and not self.metadata_dict[sid]['disabled']])
                 disabled = total - enabled
                 if include_empty_substat or total > 0:
                     retstr += "\t{} (Total: {}; Enabled: {}; Disabled: {})\n".format(ORANGE + value + RESET, total, enabled, disabled)
@@ -1506,11 +1579,11 @@ class Ruleset():
                 if len(metadata_string) > 0:
                     metadata_string = metadata_string[:-2] + ';'
                     if metadata_keyword_re.search(self.metadata_dict[s]['raw_rule']):
-                        self.metadata_dict[s]['raw_rule'] = metadata_keyword_re.sub(r'\g<PRE>' + metadata_string, self.metadata_dict[s]['raw_rule'])
+                        self._set_raw_rule(s, metadata_keyword_re.sub(r'\g<PRE>' + metadata_string, self.metadata_dict[s]['raw_rule']))
                     else:
                         # no 'metadata' keyword in original rule; add one.
                         metadata_string = " metadata:{})".format(metadata_string)
-                        self.metadata_dict[s]['raw_rule'] = eol_re.sub(metadata_string, self.metadata_dict[s]['raw_rule'])
+                        self._set_raw_rule(s, eol_re.sub(metadata_string, self.metadata_dict[s]['raw_rule']))
                 else:
                     print_warning("No metadata found for SID {}.".format(s))
         if outfile is None:

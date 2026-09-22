@@ -508,3 +508,33 @@ class TestExampleFilters:
         all_cve = set(example_ruleset.filter_ruleset('"cve <ALL>"'))
         assert newer | older == all_cve
         assert not (newer & older)
+
+
+class TestScopedFilter:
+    """``filter_ruleset(..., sids=...)`` restricts evaluation to the given SIDs."""
+
+    def test_scope_limits_results(self, small_ruleset):
+        assert set(small_ruleset.filter_ruleset('"priority high"', sids=[1, 3, 6])) == {1, 6}
+
+    def test_empty_scope_gives_empty_result(self, small_ruleset):
+        assert small_ruleset.filter_ruleset('"priority <ALL>"', sids=[]) == []
+
+    def test_negation_is_relative_to_scope(self, small_ruleset):
+        assert set(small_ruleset.filter_ruleset('NOT "priority high"', sids=[1, 3, 5])) == {3, 5}
+        assert set(small_ruleset.filter_ruleset('NOT "nosuchkey x"', sids=[2, 4])) == {2, 4}
+
+    def test_regex_and_range_terms_respect_scope(self, small_ruleset):
+        assert set(small_ruleset.filter_ruleset('"msg_regex /Acme/"', sids=[2, 7])) == {2, 7}
+        assert set(small_ruleset.filter_ruleset('"created_at >= 2019-01-01"', sids=[1, 3, 5])) == {3, 5}
+        assert set(small_ruleset.filter_ruleset('"risk_score > 50" OR "cve >= 2020-0000"', sids=[1, 5])) == {1}
+
+    def test_scope_matches_intersecting_afterwards(self, small_ruleset):
+        fs = '("priority high" OR "msg_regex /DNS/") AND NOT "protocols smb" AND "created_at > 2017-01-01"'
+        scope = [1, 2, 5, 8]
+        assert set(small_ruleset.filter_ruleset(fs, sids=scope)) == set(small_ruleset.filter_ruleset(fs)) & set(scope)
+
+    def test_repeated_regex_filter_gives_same_result(self, small_ruleset):
+        first = set(small_ruleset.filter_ruleset('"rule_regex /priority:1;/"'))
+        assert first == {1, 6}
+        assert set(small_ruleset.filter_ruleset('"rule_regex /priority:1;/"', sids=[6, 7])) == {6}
+        assert set(small_ruleset.filter_ruleset('"rule_regex /priority:1;/"')) == first

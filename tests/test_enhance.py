@@ -86,7 +86,7 @@ class TestDetectionDirection:
     def test_direction(self, src, direction, dst, expected):
         rs = Ruleset(make_rule(1, src=src, direction=direction, dst=dst) + "\n", enhance=True)
         assert rs.metadata_dict[1]['metadata']['detection_direction'] == [expected]
-        assert rs.keys_dict['detection_direction'][expected] == [1]
+        assert rs.keys_dict['detection_direction'][expected] == {1}
 
     def test_no_detection_direction_without_enhance(self, small_ruleset):
         assert 'detection_direction' not in small_ruleset.keys_dict
@@ -99,7 +99,7 @@ class TestEnhanceMetadata:
 
     def test_cve_extracted_from_msg_and_reference(self, rs):
         assert rs.metadata_dict[2]['metadata']['cve'] == ['2017-0144']
-        assert rs.keys_dict['cve']['2017-0144'] == [2]
+        assert rs.keys_dict['cve']['2017-0144'] == {2}
 
     def test_cve_extracted_from_reference_keyword(self):
         # Regression: 'reference:cve,YYYY-NNNN' (the standard form) was not recognized
@@ -238,7 +238,7 @@ class TestEnhanceMetadata:
 
     def test_enhance_does_not_duplicate_existing_metadata(self, rs):
         assert rs.metadata_dict[1]['metadata']['protocols'].count('http') == 1
-        assert rs.keys_dict['protocols']['http'].count(1) == 1
+        assert 1 in rs.keys_dict['protocols']['http']
 
 
 @pytest.mark.examples

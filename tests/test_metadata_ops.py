@@ -7,28 +7,28 @@ class TestAddMetadata:
     def test_adds_to_both_structures(self, small_ruleset):
         small_ruleset.add_metadata(5, "verdict", "benign")
         assert small_ruleset.metadata_dict[5]['metadata']['verdict'] == ['benign']
-        assert small_ruleset.keys_dict['verdict'] == {'benign': [5]}
+        assert small_ruleset.keys_dict['verdict'] == {'benign': {5}}
 
     def test_adds_sid_to_existing_key_value(self, small_ruleset):
         small_ruleset.add_metadata(5, "confidence", "high")
         assert small_ruleset.metadata_dict[5]['metadata']['confidence'] == ['high']
-        assert small_ruleset.keys_dict['confidence']['high'] == [3, 5]
+        assert small_ruleset.keys_dict['confidence']['high'] == {3, 5}
 
     def test_lowercases_and_strips(self, small_ruleset):
         small_ruleset.add_metadata(5, "  Verdict ", " BENIGN ")
         assert small_ruleset.metadata_dict[5]['metadata']['verdict'] == ['benign']
-        assert small_ruleset.keys_dict['verdict'] == {'benign': [5]}
+        assert small_ruleset.keys_dict['verdict'] == {'benign': {5}}
 
     def test_appends_additional_value_for_existing_key(self, small_ruleset):
         small_ruleset.add_metadata(1, "protocols", "udp")
         assert set(small_ruleset.metadata_dict[1]['metadata']['protocols']) == {'http', 'tcp', 'udp'}
-        assert small_ruleset.keys_dict['protocols']['udp'] == [5, 1]
+        assert small_ruleset.keys_dict['protocols']['udp'] == {5, 1}
 
     def test_no_duplicate_on_repeat(self, small_ruleset):
         small_ruleset.add_metadata(1, "protocols", "http")
         small_ruleset.add_metadata(1, "protocols", "http")
         assert small_ruleset.metadata_dict[1]['metadata']['protocols'].count('http') == 1
-        assert small_ruleset.keys_dict['protocols']['http'].count(1) == 1
+        assert 1 in small_ruleset.keys_dict['protocols']['http']
 
     def test_invalid_sid_raises(self, small_ruleset):
         with pytest.raises(AristotleException, match="sid is invalid"):

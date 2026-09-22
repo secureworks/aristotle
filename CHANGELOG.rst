@@ -85,3 +85,18 @@ Bug Fixes:
   - ``examples/pfmod-example.yaml`` contained a ``rule_regex`` pattern missing its closing ``/``.
   - Leading whitespace inside a quoted filter string token (e.g. ``"  priority high"``) caused the token to be ignored.
   - The RFC 1918 block ``192.168.0.0/16`` was listed as ``192.168.0.0/24`` when reducing IP values for ``detection_direction``.
+
+2.2.0 (2026-09-18)
+##################
+
+Bug Fixes:
+
+  - When a PFMod action changed a rule's text (``set_msg``, ``set_classtype``, or a ``regex_sub`` affecting either), the ``filter_string`` of subsequent PFMod rules still matched the original ``msg`` (via ``msg_regex``) and ``classtype`` values, contrary to the documented top-to-bottom ordering behavior.  Both are now updated along with the rule text, and the ``classtype`` change is reflected in the ``metadata`` keyword on output when ``modify_metadata`` is enabled.
+
+Performance:
+
+  - The internal key-value-pair index (``Ruleset.keys_dict``) now maps each value to a ``set`` of SIDs instead of a ``list``.  Adding a metadata key-value pair previously scanned the existing SID list for that pair, which made ruleset loading quadratic in the number of rules sharing a value; loading a 70,000 rule ruleset with ``enhance`` and ``normalize`` dropped from about 150 seconds to under 40.  Code that reads ``keys_dict`` directly and expects lists (e.g. indexing or ``.count()``) will need to be updated.
+  - Filter evaluation only considers a candidate set of SIDs: PFMod rules are evaluated against just the SIDs passed to PFMod (``filter_ruleset()`` and ``get_sids()`` gained an optional ``sids``/``candidates`` parameter), and the terms of an ``AND`` are evaluated cheapest first so ``msg_regex``/``rule_regex`` terms are only applied to the rules that survived the other terms.
+  - ``msg_regex`` and ``rule_regex`` results are remembered per rule and reused by later filter strings (e.g. the same regex term repeated across PFMod rules); a rule's cached results are discarded whenever its text is modified, so later PFMod rules still see the changes made by earlier ones.
+  - Range comparisons (``created_at``, ``cve``, ``risk_score``, etc.) are done once per distinct metadata value instead of once per rule; a ``created_at`` range filter over a 123,000 rule ruleset dropped from 12 seconds to 0.25.
+  - Ruleset loading: metadata enhancement checks keyword names for a protocol prefix in one pass instead of one pass per known protocol; normalization parses dates already in ``YYYY-MM-DD`` form without going through ``dateutil``; and a redundant per-key-value-pair de-duplication loop was removed from rule parsing (``add_metadata()`` already prevents duplicate values, and metadata values now keep the order in which they were encountered rather than an arbitrary one).  Loading the Emerging Threats ruleset (70,000 rules) with ``enhance`` and ``normalize`` now takes under 10 seconds; it took about 150 before this release.
