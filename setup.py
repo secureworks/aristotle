@@ -18,7 +18,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/x-rst",
     url="https://github.com/secureworks/aristotle",
-    packages=find_packages(),
+    packages=find_packages(exclude=["tests", "tests.*"]),
     install_requires=[
         "boolean.py>=3.6,<=3.8",
         "python-dateutil",
